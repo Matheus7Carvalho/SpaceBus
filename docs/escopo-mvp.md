@@ -28,8 +28,8 @@ Testar, em operação limitada, se passageiros conseguem **encontrar, acompanhar
 
 | # | Módulo | Escopo (seção do documento) | Situação |
 |---|---|---|---|
-| 1 | **Cadastro operacional** | 4.4: veículos, rota e pontos, viagens com horário, preço, capacidade; publicar, suspender, cancelar | **Entregue para teste** ([modulo-01-cadastro-operacional.md](modulo-01-cadastro-operacional.md)) |
-| 2 | Consulta de viagens (passageiro) | 4.1: busca por origem/destino/data, detalhe da rota, mensagem sem resultado | A fazer |
+| 1 | **Cadastro operacional** | 4.4: veículos, rota e pontos, viagens com horário, preço, capacidade; publicar, suspender, cancelar | **Aprovado com ressalvas** ([modulo-01-cadastro-operacional.md](modulo-01-cadastro-operacional.md)) |
+| 2 | **Consulta de viagens** (passageiro) | 4.1: busca por origem/destino/data, detalhe da rota, mensagem sem resultado | **Aprovado com ressalvas, em teste** ([modulo-02-consulta-viagens.md](modulo-02-consulta-viagens.md)) |
 | 3 | Reserva e pagamento | 4.3: reserva com código, bloqueio temporário da vaga, provedor externo, sem dupla venda | A fazer |
 | 4 | Localização da viagem | 4.2: posição pelo celular do motorista, hora da última atualização, aviso de dado desatualizado | A fazer |
 | 5 | Notificações | 4.5: confirmação, alteração/cancelamento, lembrete; WhatsApp com consentimento | A fazer |

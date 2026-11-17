@@ -155,6 +155,58 @@ test.describe('Listagem de viagens', () => {
     await expect(link).toHaveCount(0)
   })
 
+  test('agenda vem do servidor: de hoje em diante sem dia, e só o dia escolhido com filtro', async ({ page }) => {
+    const pedidos: string[] = []
+    page.on('request', (r) => {
+      if (r.url().includes('/api/viagem/agenda')) pedidos.push(r.url())
+    })
+    await page.goto(LISTA)
+    await expect(page.getByText(/^De hoje em diante · /)).toBeVisible()
+
+    const amanha = new Date()
+    amanha.setDate(amanha.getDate() + 1)
+    const dia = `${amanha.getFullYear()}-${String(amanha.getMonth() + 1).padStart(2, '0')}-${String(amanha.getDate()).padStart(2, '0')}`
+    await page.getByRole('search', { name: 'Filtros' }).getByLabel('Dia').fill(dia)
+
+    await expect(page.getByText(/^Viagens do dia · /)).toBeVisible()
+    await expect(page.locator(`tbody a[href$="${SEED.viagemPublicada}"]`)).toHaveCount(1)
+    expect(pedidos.some((u) => u.includes(`dia=${dia}`))).toBe(true)
+  })
+
+  test('agenda filtra rota e situação no banco', async ({ page }) => {
+    const resposta = await page.request.get('/api/viagem/agenda', { params: { rotaId: SEED.rotaCentroAeroporto, status: 'CANCELADA' } })
+    expect(resposta.ok()).toBe(true)
+    const { content, page: pagina } = (await resposta.json()) as { content: (Viagem & { rotaId: string; partida: string })[]; page: { size: number } }
+
+    expect(content.map((v) => v.id)).toContain(SEED.viagemCancelada)
+    expect(content.every((v) => v.status === 'CANCELADA' && v.rotaId === SEED.rotaCentroAeroporto)).toBe(true)
+    const partidas = content.map((v) => v.partida)
+    expect(partidas).toEqual([...partidas].sort())
+    expect(pagina.size).toBe(100)
+  })
+
+  test('Mostrar mais busca só a próxima página e some na última', async ({ page }) => {
+    // Simula 2 páginas com a primeira viagem da seed em cada uma (o volume real não chega a 100).
+    const base = (await (await page.request.get('/api/viagem/agenda')).json()).content[0] as Viagem
+    const paginasPedidas: string[] = []
+    await page.route('**/api/viagem/agenda**', (route) => {
+      const numero = Number(new URL(route.request().url()).searchParams.get('page') ?? 0)
+      paginasPedidas.push(String(numero))
+      return route.fulfill({
+        json: { content: [{ ...base, id: `${base.id.slice(0, -1)}${numero}` }], page: { size: 1, number: numero, totalElements: 2, totalPages: 2 } },
+      })
+    })
+    await page.goto(LISTA)
+
+    await expect(page.getByText('De hoje em diante · 1 de 2 viagens')).toBeVisible()
+    await page.getByRole('button', { name: 'Mostrar mais' }).click()
+
+    await expect(page.getByText('De hoje em diante · 2 viagens')).toBeVisible()
+    await expect(page.locator('tbody tr')).toHaveCount(2)
+    await expect(page.getByRole('button', { name: 'Mostrar mais' })).toHaveCount(0)
+    expect(paginasPedidas).toEqual(['0', '1'])
+  })
+
   test('linha abre a viagem e Cancelar volta com os filtros', async ({ page }) => {
     await page.goto(`${LISTA}?situacao=PUBLICADA`)
 

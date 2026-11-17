@@ -10,10 +10,13 @@ import com.spacebus.ops.domain.repository.usuario.UsuarioRepository;
 import com.spacebus.ops.domain.repository.veiculo.VeiculoRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
@@ -106,6 +109,17 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
         var viagem = buscar(id);
         if (viagem.getStatus() == CANCELADA) throw new DomainException("A viagem já está cancelada.");
         return mudarStatus(viagem, CANCELADA);
+    }
+
+    /** "Sem dia" vai até um horizonte longo em vez de deixar o fim aberto (parâmetro sempre tipado). */
+    private static final int HORIZONTE_ANOS = 10;
+
+    @Override
+    public Page<Viagem> agenda(LocalDate dia, String rotaId, StatusViagem status, Pageable pageable) {
+        var inicio = (dia != null ? dia : LocalDate.now(clock)).atStartOfDay();
+        var fim = dia != null ? inicio.plusDays(1) : inicio.plusYears(HORIZONTE_ANOS);
+        var rota = rotaId == null || rotaId.isBlank() ? null : rotaId;
+        return getRepository().agenda(inicio, fim, rota, status == null ? null : status.name(), pageable);
     }
 
     /** Publicada ou suspensa já foi oferecida ao passageiro: sai do ar por cancelamento, não por exclusão. */

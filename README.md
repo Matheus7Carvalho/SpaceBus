@@ -14,7 +14,8 @@ MVP para passageiros encontrarem, acompanharem, reservarem e pagarem viagens de 
 | # | Módulo | Situação |
 |---|---|---|
 | 1 | [Cadastro operacional](docs/modulo-01-cadastro-operacional.md): veículos, rotas com pontos de parada, viagens (publicar, suspender, cancelar) | Em teste |
-| 2–6 | Busca do passageiro, reserva e pagamento, localização, notificações, indicadores | A fazer ([docs/escopo-mvp.md](docs/escopo-mvp.md)) |
+| 2 | [Consulta de viagens](docs/modulo-02-consulta-viagens.md): busca por origem, destino e data; detalhe com o percurso | Em teste |
+| 3–6 | Reserva e pagamento, localização, notificações, indicadores | A fazer ([docs/escopo-mvp.md](docs/escopo-mvp.md)) |
 
 ## Requisitos
 
@@ -61,10 +62,10 @@ Criadas pela seed do Liquibase (contexto `dev`). A tela de login tem atalhos par
 
 | Perfil | E-mail | Senha | Acessa hoje |
 |---|---|---|---|
-| Administrador | `admin@spacebus.local` | `demo123` | Viagens, Rotas, Veículos |
-| Operador | `operador@spacebus.local` | `demo123` | Viagens, Rotas, Veículos |
-| Motorista | `motorista@spacebus.local` | `demo123` | Nenhum módulo ainda |
-| Passageiro | `passageiro@spacebus.local` | `demo123` | Nenhum módulo ainda |
+| Administrador | `admin@spacebus.local` | `demo123` | Viagens, Rotas, Veículos, Buscar viagens |
+| Operador | `operador@spacebus.local` | `demo123` | Viagens, Rotas, Veículos, Buscar viagens |
+| Motorista | `motorista@spacebus.local` | `demo123` | Buscar viagens |
+| Passageiro | `passageiro@spacebus.local` | `demo123` | Buscar viagens |
 
 Há também um segundo motorista, `caio.nunes@spacebus.local`. A seed traz a rota "Centro – Aeroporto" (4 pontos), três veículos (um inativo) e quatro viagens (publicadas, rascunho e cancelada), com partidas a partir do dia seguinte à carga. As datas são fixadas na primeira carga; para renovar a seed: `docker compose down -v` e suba o backend de novo.
 

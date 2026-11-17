@@ -22,7 +22,7 @@ Rota ────┘        │                                               �
 | **Veículo** | Van (ou ônibus) da transportadora: placa, descrição, tipo, capacidade, ativo | `Veiculo`, `/api/veiculo`, tela `/cadastros/veiculos` | Implementado |
 | **Rota** | Percurso com nome, origem, destino e pontos de parada ordenados | `Rota`, `/api/rota`, tela `/cadastros/rotas` | Implementado |
 | **Ponto de parada** | Local de embarque/desembarque da rota, na ordem do percurso, com referência opcional | `PontoParada` (sempre dentro da rota) | Implementado |
-| **Viagem** | Uma partida da rota num horário, com veículo, motorista (opcional), preço e capacidade (lugares à venda) | `Viagem`, `/api/viagem`, tela `/operacao/viagens` | Implementado (cadastro do operador) |
+| **Viagem** | Uma partida da rota num horário, com veículo, motorista (opcional), preço e capacidade (lugares à venda) | `Viagem`, `/api/viagem`, tela `/operacao/viagens` | Implementado (cadastro do operador; busca e detalhe do passageiro em `/api/busca`, tela `/buscar`) |
 | **Situação da viagem** | `RASCUNHO → PUBLICADA ⇄ SUSPENSA`; qualquer uma → `CANCELADA` (definitivo). Só `PUBLICADA` aparece ao passageiro | `StatusViagem`, `POST /api/viagem/{id}/publicar`, `/suspender`, `/cancelar` | Implementado |
 | **Reserva** | Lugar(es) de um passageiro numa viagem, identificada por código; bloqueio temporário durante o pagamento | — | A implementar (módulo 3) |
 | **Vagas disponíveis** | Capacidade − reservas confirmadas e bloqueios vigentes. Nunca negativa; nunca dupla venda | — | A implementar (módulo 3) |
@@ -30,7 +30,7 @@ Rota ────┘        │                                               �
 | **Localização** | Última posição da viagem ativa enviada pelo celular do motorista, com hora da atualização | — | A implementar (módulo 4) |
 | **Notificação** | Mensagem transacional (confirmação, alteração, cancelamento, lembrete); falha de entrega não muda a reserva | — | A implementar (módulo 5) |
 
-Perfis (`Perfil`): `ADMINISTRADOR` (equipe Space Bus), `OPERADOR` (transportadora), `MOTORISTA`, `PASSAGEIRO`. Menu: **Operação** (Viagens), **Cadastros** (Rotas, Veículos). "Lugares" é o termo de tela para capacidade.
+Perfis (`Perfil`): `ADMINISTRADOR` (equipe Space Bus), `OPERADOR` (transportadora), `MOTORISTA`, `PASSAGEIRO`. Menu: **Operação** (Viagens), **Cadastros** (Rotas, Veículos), **Passageiro** (Buscar viagens, para todos os perfis). **Trecho** é o par embarque → desembarque do passageiro dentro do percurso da rota. "Lugares" é o termo de tela para capacidade.
 
 ## Decisões de arquitetura
 
@@ -328,7 +328,7 @@ Testes instáveis (flaky) são defeito, não azar. Regras:
 Ordem dos módulos (detalhe em `docs/escopo-mvp.md`). Um módulo só começa depois do anterior aprovado pelo QA.
 
 1. **Cadastro operacional** (veículo, rota, viagem) — entregue para teste.
-2. **Consulta de viagens** pelo passageiro (origem, destino, data; detalhe da rota; mensagem sem resultado). Endpoint próprio de leitura, só viagens `PUBLICADA` com partida futura.
+2. **Consulta de viagens** pelo passageiro — entregue para teste. Endpoint próprio de leitura (`/api/busca`), só viagens `PUBLICADA` com partida futura; "lugares disponíveis" calculado num único ponto (`BuscaViagemService.lugaresDisponiveis`) que o módulo 3 completa com as reservas.
 3. **Reserva e pagamento** (código, bloqueio temporário, provedor externo, sem dupla venda).
 4. **Localização** da viagem ativa (celular do motorista, hora da última atualização, dado desatualizado sinalizado).
 5. **Notificações** (aplicação + WhatsApp/e-mail com consentimento).

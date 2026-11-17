@@ -21,7 +21,12 @@ export function useSalvarRota(id: string | undefined) {
     mutationFn: (dados: RotaRequest) => (id ? rotasApi.atualizar(id, dados) : rotasApi.criar(dados)),
     onSuccess: (salva) => {
       queryClient.setQueryData(rotaKeys.detalhe(salva.id), salva)
-      return queryClient.invalidateQueries({ queryKey: rotaKeys.all, exact: true })
+      // Nomes de pontos aparecem na agenda e na busca do passageiro (resultados e sugestões de locais).
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: rotaKeys.all, exact: true }),
+        queryClient.invalidateQueries({ queryKey: ['viagens', 'agenda'] }),
+        queryClient.invalidateQueries({ queryKey: ['busca'] }),
+      ])
     },
   })
 }

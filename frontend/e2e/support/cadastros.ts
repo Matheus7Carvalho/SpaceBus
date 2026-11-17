@@ -11,6 +11,7 @@ export const SEED = {
   vanSprinter: '9a1b0000-0001-4c00-8000-000000000001',
   vanMaster: '9a1b0000-0001-4c00-8000-000000000002',
   viagemPublicada: '7d3e0000-0001-4e00-a000-000000000001',
+  viagemPublicada12h30: '7d3e0000-0001-4e00-a000-000000000002',
   viagemCancelada: '7d3e0000-0001-4e00-a000-000000000004',
 } as const
 

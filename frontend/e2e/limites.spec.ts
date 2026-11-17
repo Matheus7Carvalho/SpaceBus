@@ -25,6 +25,7 @@ test.describe('Todo campo tem limite', () => {
     '/cadastros/veiculos',
     '/cadastros/rotas',
     '/operacao/viagens',
+    '/buscar',
   ]) {
     test(`tela ${tela}`, async ({ page }) => {
       await entrar(page, contas.operador)

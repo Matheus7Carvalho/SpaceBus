@@ -57,7 +57,7 @@ class LimitesDosRequestsTest {
     @Test
     void encontraOsRequests() throws Exception {
         assertThat(requests()).extracting(Class::getSimpleName)
-                .contains("LoginRequest", "UsuarioRequest", "VeiculoRequest", "RotaRequest", "PontoParadaRequest", "ViagemRequest");
+                .contains("LoginRequest", "UsuarioRequest", "VeiculoRequest", "RotaRequest", "PontoParadaRequest", "ViagemRequest", "BuscaViagemRequest");
     }
 
     @Test

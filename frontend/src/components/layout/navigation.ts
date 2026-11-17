@@ -1,4 +1,4 @@
-import { BusIcon, CalendarClockIcon, RouteIcon, type LucideIcon } from 'lucide-react'
+import { BusIcon, CalendarClockIcon, RouteIcon, SearchIcon, type LucideIcon } from 'lucide-react'
 import { temPerfil } from '@/features/auth/permissoes'
 import type { Perfil } from '@/features/auth/types'
 
@@ -20,6 +20,7 @@ const OPERACAO = ['ADMINISTRADOR', 'OPERADOR'] as const satisfies readonly Perfi
  * A ordem define o destino inicial: cada perfil cai no primeiro item permitido.
  *
  * Fluxo B do escopo (docs/escopo-mvp.md): cadastra veículo e rota, depois programa e publica viagens.
+ * Fluxo A: o passageiro busca e abre o detalhe da viagem.
  */
 export const navGrupos: readonly NavGrupo[] = [
   {
@@ -32,6 +33,11 @@ export const navGrupos: readonly NavGrupo[] = [
       { title: 'Rotas', to: '/cadastros/rotas', icon: RouteIcon, perfis: OPERACAO },
       { title: 'Veículos', to: '/cadastros/veiculos', icon: BusIcon, perfis: OPERACAO },
     ],
+  },
+  {
+    // Por último: a operação continua sendo a tela inicial de Operador e Administrador.
+    titulo: 'Passageiro',
+    itens: [{ title: 'Buscar viagens', to: '/buscar', icon: SearchIcon }],
   },
 ]
 

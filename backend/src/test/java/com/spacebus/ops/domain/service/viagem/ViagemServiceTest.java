@@ -20,9 +20,12 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.data.domain.PageRequest;
+
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -231,6 +234,23 @@ class ViagemServiceTest {
         assertThatThrownBy(() -> service.publicar("vg1")).hasMessage("O veículo SBV1A23 já tem viagem nesse horário.");
         assertThat(viagem.getStatus()).isEqualTo(RASCUNHO);
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void agendaComDiaUsaSoAqueleDia() {
+        var pagina = PageRequest.of(0, 100);
+        service.agenda(LocalDate.of(2026, 11, 10), "r1", PUBLICADA, pagina);
+
+        verify(repository).agenda(LocalDateTime.of(2026, 11, 10, 0, 0), LocalDateTime.of(2026, 11, 11, 0, 0), "r1", "PUBLICADA", pagina);
+    }
+
+    @Test
+    void agendaSemDiaComecaHojeEFiltrosVaziosViramNulos() {
+        var pagina = PageRequest.of(0, 100);
+        service.agenda(null, " ", null, pagina);
+
+        var hoje = AGORA.toLocalDate().atStartOfDay();
+        verify(repository).agenda(hoje, hoje.plusYears(10), null, null, pagina);
     }
 
     @Test

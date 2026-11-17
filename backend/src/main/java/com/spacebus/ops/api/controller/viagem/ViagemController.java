@@ -8,7 +8,15 @@ import com.spacebus.ops.domain.model.viagem.ViagemResponse;
 import com.spacebus.ops.domain.service.viagem.IViagemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import com.spacebus.ops.domain.entity.enums.StatusViagem;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.time.LocalDate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,6 +32,19 @@ public class ViagemController extends BaseController<Viagem, ViagemRequest, Viag
     protected ViagemController(final IViagemMapper mapper, final IViagemService service) {
         super(mapper, service);
         this.service = service;
+    }
+
+    /** Ordem fixa por partida (o cliente não escolhe o campo) e no máximo 100 por página. */
+    public static final int AGENDA_POR_PAGINA = 100;
+
+    @GetMapping("/agenda")
+    @Operation(description = "Viagens do operador filtradas no servidor, por horário de partida. Sem dia: de hoje em diante.")
+    public Page<ViagemResponse> agenda(@RequestParam(required = false) LocalDate dia,
+                                       @RequestParam(required = false) String rotaId,
+                                       @RequestParam(required = false) StatusViagem status,
+                                       @RequestParam(defaultValue = "0") int page) {
+        var pagina = PageRequest.of(Math.max(page, 0), AGENDA_POR_PAGINA, Sort.by("partida", "id"));
+        return service.agenda(dia, rotaId, status, pagina).map(getMapper()::toResponse);
     }
 
     @PostMapping("/{id}/publicar")

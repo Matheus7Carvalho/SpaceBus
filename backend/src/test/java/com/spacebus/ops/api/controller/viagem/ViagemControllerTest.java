@@ -24,12 +24,20 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -127,6 +135,53 @@ class ViagemControllerTest {
         mvc.perform(post("/api/viagem/vg1/publicar")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PUBLICADA"));
         mvc.perform(post("/api/viagem/vg1/suspender")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUSPENSA"));
         mvc.perform(post("/api/viagem/vg1/cancelar")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELADA"));
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERADOR")
+    void agendaRepassaFiltrosEPaginaPorPartida() throws Exception {
+        when(service.agenda(any(), any(), any(), any())).thenAnswer(inv -> new PageImpl<>(List.of(viagem(StatusViagem.PUBLICADA)), inv.getArgument(3), 1));
+
+        mvc.perform(get("/api/viagem/agenda?dia=2026-11-18&rotaId=r1&status=PUBLICADA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].status").value("PUBLICADA"))
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.page.size").value(100));
+
+        var pagina = ArgumentCaptor.forClass(Pageable.class);
+        verify(service).agenda(eq(LocalDate.of(2026, 11, 18)), eq("r1"), eq(StatusViagem.PUBLICADA), pagina.capture());
+        assertThat(pagina.getValue().getSort().getOrderFor("partida")).isNotNull();
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERADOR")
+    void agendaIgnoraOrdenacaoETamanhoDoClienteEAceitaPagina() throws Exception {
+        when(service.agenda(any(), any(), any(), any())).thenReturn(Page.empty());
+
+        mvc.perform(get("/api/viagem/agenda?page=2&size=5000&sort=motorista.senha")).andExpect(status().isOk());
+
+        var pagina = ArgumentCaptor.forClass(Pageable.class);
+        verify(service).agenda(isNull(), isNull(), isNull(), pagina.capture());
+        assertThat(pagina.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(pagina.getValue().getPageSize()).isEqualTo(100);
+        assertThat(pagina.getValue().getSort()).containsExactly(Sort.Order.asc("partida"), Sort.Order.asc("id"));
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERADOR")
+    void agendaSemFiltros() throws Exception {
+        when(service.agenda(any(), any(), any(), any())).thenReturn(Page.empty());
+
+        mvc.perform(get("/api/viagem/agenda")).andExpect(status().isOk());
+
+        verify(service).agenda(isNull(), isNull(), isNull(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "PASSAGEIRO")
+    void passageiroNaoVeAgenda() throws Exception {
+        mvc.perform(get("/api/viagem/agenda")).andExpect(status().isForbidden());
+        verifyNoInteractions(service);
     }
 
     @Test

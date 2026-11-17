@@ -1,13 +1,20 @@
-# SmartMall Ops AI
+# SpaceBus
 
-MVP de gestão operacional para shopping centers. Requisitos em [docs/SmartMall_Ops_AI_Documentacao_Inicial.md](docs/SmartMall_Ops_AI_Documentacao_Inicial.md). Padrões de projeto em [CLAUDE.md](CLAUDE.md).
+MVP para passageiros encontrarem, acompanharem, reservarem e pagarem viagens de van, e para a transportadora manter horários, capacidade e localização atualizados. Escopo em [docs/escopo-mvp.md](docs/escopo-mvp.md). Padrões de projeto em [CLAUDE.md](CLAUDE.md).
 
 | Pasta | Conteúdo |
 |---|---|
 | `backend/` | API Spring Boot 3.5 (Java 21), PostgreSQL, Liquibase |
 | `frontend/` | React + TypeScript (Vite), Tailwind, shadcn/ui |
-| `docs/dist/` | Protótipo HTML5 original, apenas referência |
-| `docs/` | Documentação |
+| `docs/` | Escopo do MVP e documentação por módulo |
+| `.claude/agents/` | Agentes do time: `product-owner`, `developer`, `qa-tester` |
+
+## Módulos
+
+| # | Módulo | Situação |
+|---|---|---|
+| 1 | [Cadastro operacional](docs/modulo-01-cadastro-operacional.md): veículos, rotas com pontos de parada, viagens (publicar, suspender, cancelar) | Em teste |
+| 2–6 | Busca do passageiro, reserva e pagamento, localização, notificações, indicadores | A fazer ([docs/escopo-mvp.md](docs/escopo-mvp.md)) |
 
 ## Requisitos
 
@@ -30,6 +37,16 @@ cd frontend && npm install && npm run dev
 
 O backend sobe o PostgreSQL do `compose.yaml` automaticamente e aplica as migrações com dados de demonstração. O `.env` é opcional; veja `.env.example`.
 
+**Portas ocupadas?** Postgres, Vite e o proxy da API são configuráveis por variável de ambiente:
+
+```bash
+cd backend && POSTGRES_PORT=5433 ./mvnw spring-boot:run
+```
+
+```bash
+cd frontend && FRONTEND_PORT=5174 npm run dev
+```
+
 ## Rodar tudo em containers
 
 ```bash
@@ -42,15 +59,14 @@ Frontend em http://localhost:5173, API em http://localhost:8080.
 
 Criadas pela seed do Liquibase (contexto `dev`). A tela de login tem atalhos para cada perfil.
 
-| Perfil | E-mail | Senha |
-|---|---|---|
-| Administrador | `admin@smartmall.local` | `demo123` |
-| Supervisor | `supervisor@smartmall.local` | `demo123` |
-| Funcionário | `funcionario@smartmall.local` | `demo123` |
+| Perfil | E-mail | Senha | Acessa hoje |
+|---|---|---|---|
+| Administrador | `admin@spacebus.local` | `demo123` | Viagens, Rotas, Veículos |
+| Operador | `operador@spacebus.local` | `demo123` | Viagens, Rotas, Veículos |
+| Motorista | `motorista@spacebus.local` | `demo123` | Nenhum módulo ainda |
+| Passageiro | `passageiro@spacebus.local` | `demo123` | Nenhum módulo ainda |
 
-Também há funcionários para compor as equipes, todos com senha `demo123`: `pedro.lima@`, `luana.freitas@`, `elisa.rocha@` e `caio.nunes@smartmall.local`.
-
-A seed traz ainda 8 equipamentos, 4 equipes, 2 modelos de checklist e 2 manutenções programadas. A semanal do Elevador E1 começa no passado, então Tarefas já mostra tarefas atrasadas.
+Há também um segundo motorista, `caio.nunes@spacebus.local`. A seed traz a rota "Centro – Aeroporto" (4 pontos), três veículos (um inativo) e quatro viagens (publicadas, rascunho e cancelada), com partidas a partir do dia seguinte à carga. As datas são fixadas na primeira carga; para renovar a seed: `docker compose down -v` e suba o backend de novo.
 
 ## Testes
 
@@ -59,7 +75,7 @@ cd backend && ./mvnw test
 ```
 
 ```bash
-cd frontend && npm run build && npm run lint
+cd frontend && npx tsc -b && npm run lint && npm run build
 ```
 
 Testes E2E (Playwright). Exigem o backend no ar com a seed de dev; o Vite é iniciado automaticamente se não estiver rodando. Na primeira vez, instale o navegador:
@@ -75,3 +91,4 @@ cd frontend && npm run test:e2e
 Relatório em `frontend/playwright-report`. Para outra URL: `E2E_BASE_URL=http://host:porta npm run test:e2e`.
 
 Antes dos testes, uma verificação aguarda até 60 s pelo frontend, pelo backend e pelo login da seed. Se o ambiente não estiver pronto, a suíte não roda e a mensagem indica a causa.
+

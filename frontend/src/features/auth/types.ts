@@ -1,9 +1,10 @@
-export type Perfil = 'ADMINISTRADOR' | 'SUPERVISOR' | 'FUNCIONARIO'
+export type Perfil = 'ADMINISTRADOR' | 'OPERADOR' | 'MOTORISTA' | 'PASSAGEIRO'
 
 export const perfilLabel: Record<Perfil, string> = {
   ADMINISTRADOR: 'Administrador',
-  SUPERVISOR: 'Supervisor',
-  FUNCIONARIO: 'Funcionário',
+  OPERADOR: 'Operador',
+  MOTORISTA: 'Motorista',
+  PASSAGEIRO: 'Passageiro',
 }
 
 /** Espelha UsuarioResponse. */

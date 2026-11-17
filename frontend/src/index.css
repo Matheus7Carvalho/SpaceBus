@@ -70,7 +70,7 @@
     --destructive: oklch(0.63 0.2 22);
     --success: oklch(0.66 0.14 158);
     --warning: oklch(0.78 0.15 72);
-    /* Tarefa em execução: violeta, distinto do azul de "agendada" e do âmbar de "em análise". */
+    /* Tom "andamento": violeta, distinto do azul de "info" e do âmbar de "atenção". */
     --andamento: oklch(0.52 0.19 295);
     --border: oklch(0.92 0.015 240);
     --input: oklch(0.92 0.015 240);

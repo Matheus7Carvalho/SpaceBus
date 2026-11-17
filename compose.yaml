@@ -1,13 +1,13 @@
-name: smartmall-ops
+name: spacebus
 
 services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-smartmall}
-      POSTGRES_USER: ${POSTGRES_USER:-smartmall}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartmall}
+      POSTGRES_DB: ${POSTGRES_DB:-spacebus}
+      POSTGRES_USER: ${POSTGRES_USER:-spacebus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spacebus}
       TZ: America/Araguaina
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -25,9 +25,9 @@ services:
     build: ./backend
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      POSTGRES_DB: ${POSTGRES_DB:-smartmall}
-      POSTGRES_USER: ${POSTGRES_USER:-smartmall}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartmall}
+      POSTGRES_DB: ${POSTGRES_DB:-spacebus}
+      POSTGRES_USER: ${POSTGRES_USER:-spacebus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spacebus}
     ports:
       - "8080:8080"
     depends_on:

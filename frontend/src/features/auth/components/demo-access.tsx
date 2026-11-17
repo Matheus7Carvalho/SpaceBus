@@ -4,9 +4,10 @@ import { perfilLabel, type Perfil } from '../types'
 
 /** Contas da seed de desenvolvimento (backend/src/main/resources/db/changes/usuario). */
 const contas: { perfil: Perfil; email: string }[] = [
-  { perfil: 'ADMINISTRADOR', email: 'admin@smartmall.local' },
-  { perfil: 'SUPERVISOR', email: 'supervisor@smartmall.local' },
-  { perfil: 'FUNCIONARIO', email: 'funcionario@smartmall.local' },
+  { perfil: 'ADMINISTRADOR', email: 'admin@spacebus.local' },
+  { perfil: 'OPERADOR', email: 'operador@spacebus.local' },
+  { perfil: 'MOTORISTA', email: 'motorista@spacebus.local' },
+  { perfil: 'PASSAGEIRO', email: 'passageiro@spacebus.local' },
 ]
 const SENHA_DEMO = 'demo123'
 
@@ -21,7 +22,7 @@ export function DemoAccess({ disabled, onSelect }: DemoAccessProps) {
       <FieldSeparator>
         <span id="demo-titulo">Acesso de demonstração</span>
       </FieldSeparator>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {contas.map((conta) => (
           <Button
             key={conta.perfil}

@@ -10,10 +10,12 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  // Portas configuráveis para conviver com outros serviços locais (ver .env.example).
   server: {
-    port: 5173,
+    port: Number(process.env.FRONTEND_PORT ?? 5173),
+    strictPort: true,
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': process.env.API_URL ?? 'http://localhost:8080',
     },
   },
 })

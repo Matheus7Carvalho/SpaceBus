@@ -1,6 +1,6 @@
 /**
  * Datas do backend: LocalDate ("2026-11-16") e LocalDateTime ("2026-11-16T08:00:00"), sem fuso.
- * Tudo é tratado como horário local do shopping; nunca usar toISOString (converte para UTC).
+ * Tudo é tratado como horário local da operação; nunca usar toISOString (converte para UTC).
  */
 
 const pad = (n: number) => String(n).padStart(2, '0')

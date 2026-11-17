@@ -40,9 +40,9 @@ const verificacoes: Verificacao[] = [
       const r = await fetch(`${base}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'supervisor@smartmall.local', senha: 'demo123' }),
+        body: JSON.stringify({ email: 'operador@spacebus.local', senha: 'demo123' }),
       })
-      return r.ok ? null : `Login com supervisor@smartmall.local respondeu ${r.status} (seed de dev aplicada?)`
+      return r.ok ? null : `Login com operador@spacebus.local respondeu ${r.status} (seed de dev aplicada?)`
     },
   },
 ]

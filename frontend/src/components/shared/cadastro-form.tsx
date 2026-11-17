@@ -7,7 +7,7 @@ import { FormActions } from './form-actions'
 
 type CadastroFormProps<T extends FieldValues> = {
   form: UseFormReturn<T>
-  /** Nome acessível do formulário (ex.: "Equipamento"). */
+  /** Nome acessível do formulário (ex.: "Veículo"). */
   rotulo: string
   salvando: boolean
   erro?: string

@@ -3,21 +3,15 @@ import { createBrowserRouter, type RouteObject } from 'react-router'
 import { AppShell } from '@/components/layout/app-shell'
 import { RequireAuth } from '@/features/auth/components/require-auth'
 import { RequirePerfil } from '@/features/auth/components/require-perfil'
-import { EmAnalisePage } from '@/pages/em-analise-page'
-import { TarefaPage } from '@/pages/tarefa-page'
-import { TarefasPage } from '@/pages/tarefas-page'
-import { CentralPage } from '@/pages/central-page'
-import { ChecklistFormPage } from '@/pages/checklist-form-page'
-import { ChecklistsPage } from '@/pages/checklists-page'
-import { EquipamentoFormPage } from '@/pages/equipamento-form-page'
-import { EquipamentosPage } from '@/pages/equipamentos-page'
-import { EquipeFormPage } from '@/pages/equipe-form-page'
-import { EquipesPage } from '@/pages/equipes-page'
 import { HomeRedirect } from '@/pages/home-redirect'
 import { LoginPage } from '@/pages/login-page'
 import { NotFoundPage } from '@/pages/not-found-page'
-import { ManutencaoProgramadaFormPage } from '@/pages/manutencao-programada-form-page'
-import { ManutencoesProgramadasPage } from '@/pages/manutencoes-programadas-page'
+import { RotaFormPage } from '@/pages/rota-form-page'
+import { RotasPage } from '@/pages/rotas-page'
+import { VeiculoFormPage } from '@/pages/veiculo-form-page'
+import { VeiculosPage } from '@/pages/veiculos-page'
+import { ViagemFormPage } from '@/pages/viagem-form-page'
+import { ViagensPage } from '@/pages/viagens-page'
 
 /** Aplica os perfis do item de menu correspondente à rota. */
 function protegida(rota: string, pagina: ReactNode) {
@@ -46,19 +40,9 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <HomeRedirect /> },
-      { path: 'central', element: protegida('/central', <CentralPage />) },
-      {
-        path: 'tarefas',
-        children: [
-          { index: true, element: protegida('/tarefas', <TarefasPage />) },
-          { path: ':id', element: protegida('/tarefas', <TarefaPage />) },
-        ],
-      },
-      { path: 'analise', element: protegida('/analise', <EmAnalisePage />) },
-      cadastro('/planejamento/manutencoes-programadas', <ManutencoesProgramadasPage />, <ManutencaoProgramadaFormPage />, 'nova'),
-      cadastro('/planejamento/modelos-checklist', <ChecklistsPage />, <ChecklistFormPage />),
-      cadastro('/cadastros/equipamentos', <EquipamentosPage />, <EquipamentoFormPage />),
-      cadastro('/cadastros/equipes', <EquipesPage />, <EquipeFormPage />, 'nova'),
+      cadastro('/operacao/viagens', <ViagensPage />, <ViagemFormPage />, 'nova'),
+      cadastro('/cadastros/rotas', <RotasPage />, <RotaFormPage />, 'nova'),
+      cadastro('/cadastros/veiculos', <VeiculosPage />, <VeiculoFormPage />),
       { path: '*', element: <NotFoundPage /> },
     ],
   },

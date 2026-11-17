@@ -2,10 +2,32 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "backend",
+      "runtimeExecutable": "backend/mvnw.cmd",
+      "runtimeArgs": [
+        "-f",
+        "backend/pom.xml",
+        "spring-boot:run"
+      ],
+      "port": 8080,
+      "env": {
+        "POSTGRES_PORT": "5433"
+      }
+    },
+    {
       "name": "frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "frontend"],
-      "port": 5173
+      "runtimeExecutable": "fnm",
+      "runtimeArgs": [
+        "exec",
+        "--using=22",
+        "node",
+        "frontend/node_modules/vite/bin/vite.js",
+        "frontend"
+      ],
+      "port": 5174,
+      "env": {
+        "FRONTEND_PORT": "5174"
+      }
     }
   ]
 }

@@ -1,44 +1,48 @@
-# SmartMall Ops AI
+# SpaceBus
 
-MVP de gestão operacional para shopping centers (cenário: Capim Dourado Shopping), feito para hackathon. Fluxo central: ocorrência → triagem sugerida → revisão humana → tarefa → Central de Controle → encerramento. Inclui manutenção preventiva de equipamentos.
+MVP de reserva e acompanhamento de viagens de van (piloto: uma cidade, uma transportadora, uma rota). Fluxo do passageiro: busca → detalhe → reserva → pagamento → acompanhamento da van. Fluxo da transportadora: cadastra veículo e rota → programa e publica viagens → acompanha reservas e ocupação.
 
 Referências obrigatórias antes de implementar qualquer funcionalidade:
 
-- `docs/modulo-manutencao.md` — passo a passo e regras do módulo de manutenção.
-- `docs/SmartMall_Ops_AI_Documentacao_Inicial.md` — requisitos (RF/RNF), telas, modelo de dados e critérios de aceite.
-- `INSTRUCTIONS.md` e `docs/dist/` — protótipo HTML5/JS existente. Serve de referência de fluxo e identidade visual, não de código a ser copiado.
+- `docs/escopo-mvp.md` — resumo do escopo, módulos na ordem de entrega, requisitos de aceite e decisões pendentes. O original é `docs/SpaceBus_Escopo_MVP_v0.1.docx` e prevalece.
+- `docs/modulo-NN-*.md` — histórias, critérios de aceite e plano de teste de cada módulo.
+- `.claude/agents/` — papéis do time: `product-owner` (histórias, prioridade, docs, git), `developer` (implementação com testes), `qa-tester` (validação independente e veredito). Fluxo: PO → developer → QA → PO organiza merge e docs. Nada é "feito" sem veredito do QA.
 
 ## Glossário do domínio (usar estes nomes em tela, código, API e banco)
 
 ```
-Chamado ──► Plano de ação (1..n tarefas) ──┐
-                                            ├──► Tarefa ──► execução (checklist) ──► validação
-Manutenção programada (recorrência) ────────┘
+Veículo ─┐
+         ├──► Viagem (partida, preço, capacidade, situação) ──► Reserva ──► Pagamento
+Rota ────┘        │                                               │
+ └─ Pontos de parada            Localização (motorista)           └─► Notificação
 ```
 
 | Termo | O que é | No código | Situação |
 |---|---|---|---|
-| **Tarefa** | Unidade de trabalho com data, equipe, equipamento, status e, no futuro, prazo (SLA). É onde os dois fluxos chegam. | `Tarefa`, `/api/tarefa`, tela `/tarefas` | Implementado (gerada por manutenção programada) |
-| **Responsável** | Membro da equipe que assumiu a tarefa. Continua o mesmo depois de uma reprovação | `Tarefa.responsavel`, `POST /api/tarefa/{id}/assumir` | Implementado |
-| **Execução** | Checklist preenchido (cópia do modelo feita ao assumir), observação e evidências (imagens) | `TarefaItem`, `TarefaEvidencia`, tela `/tarefas/{id}` | Implementado |
-| **Em análise** | Fila de validação: o Supervisor aprova (conclui) ou reprova (volta para execução) | `/api/tarefa/em-analise`, tela `/analise` | Implementado |
-| **Origem da tarefa** | De onde a tarefa veio | `OrigemTarefa`: `MANUTENCAO_PROGRAMADA`; `CHAMADO` entra com os chamados | Implementado |
-| **Manutenção programada** | Agendamento recorrente (ou único) que gera tarefas numa frequência | `ManutencaoProgramada`, `/api/manutencao-programada`, `/planejamento/manutencoes-programadas` | Implementado |
-| **Modelo de checklist** | Molde de verificação usado pelas tarefas; o checklist preenchido fica na tarefa | `Checklist` (nome técnico mantido), `/api/checklist`, `/planejamento/modelos-checklist` | Implementado |
-| **Chamado** | Registro de um problema (ocorrência), com triagem | — | A implementar |
-| **Plano de ação** | Conjunto de uma ou várias tarefas geradas por um chamado | — | A implementar |
+| **Veículo** | Van (ou ônibus) da transportadora: placa, descrição, tipo, capacidade, ativo | `Veiculo`, `/api/veiculo`, tela `/cadastros/veiculos` | Implementado |
+| **Rota** | Percurso com nome, origem, destino e pontos de parada ordenados | `Rota`, `/api/rota`, tela `/cadastros/rotas` | Implementado |
+| **Ponto de parada** | Local de embarque/desembarque da rota, na ordem do percurso, com referência opcional | `PontoParada` (sempre dentro da rota) | Implementado |
+| **Viagem** | Uma partida da rota num horário, com veículo, motorista (opcional), preço e capacidade (lugares à venda) | `Viagem`, `/api/viagem`, tela `/operacao/viagens` | Implementado (cadastro do operador) |
+| **Situação da viagem** | `RASCUNHO → PUBLICADA ⇄ SUSPENSA`; qualquer uma → `CANCELADA` (definitivo). Só `PUBLICADA` aparece ao passageiro | `StatusViagem`, `POST /api/viagem/{id}/publicar`, `/suspender`, `/cancelar` | Implementado |
+| **Reserva** | Lugar(es) de um passageiro numa viagem, identificada por código; bloqueio temporário durante o pagamento | — | A implementar (módulo 3) |
+| **Vagas disponíveis** | Capacidade − reservas confirmadas e bloqueios vigentes. Nunca negativa; nunca dupla venda | — | A implementar (módulo 3) |
+| **Pagamento** | Cobrança no provedor externo; reserva confirmada só após retorno confirmado | — | A implementar (módulo 3) |
+| **Localização** | Última posição da viagem ativa enviada pelo celular do motorista, com hora da atualização | — | A implementar (módulo 4) |
+| **Notificação** | Mensagem transacional (confirmação, alteração, cancelamento, lembrete); falha de entrega não muda a reserva | — | A implementar (módulo 5) |
 
-Não usar "plano" sozinho (ambíguo com Plano de ação) nem "agenda" como nome de módulo: a tela é Tarefas, e o calendário é só uma forma de vê-las. Status da tarefa: `AGENDADA → EM_EXECUCAO → EM_ANALISE → CONCLUIDA` (reprovada volta para `EM_EXECUCAO`); `CANCELADA` à parte. Menu: **Operação** (Central de Controle, Tarefas, Em análise), **Planejamento** (Manutenções programadas, Modelos de checklist), **Cadastros**.
+Perfis (`Perfil`): `ADMINISTRADOR` (equipe Space Bus), `OPERADOR` (transportadora), `MOTORISTA`, `PASSAGEIRO`. Menu: **Operação** (Viagens), **Cadastros** (Rotas, Veículos). "Lugares" é o termo de tela para capacidade.
 
 ## Decisões de arquitetura
 
 | Tema | Decisão | Observação |
 |---|---|---|
-| Backend | Spring Boot 3.5 (Java 21), base no template `JLPimenta/arch-spring` | Substitui a proposta Node.js/Express do documento |
-| Banco | PostgreSQL via Docker, migrações com Liquibase | Substitui a proposta SQLite |
-| Frontend | React + TypeScript + Vite | TypeScript compila para JavaScript; atende RNF02 no cliente |
+| Backend | Spring Boot 3.5 (Java 21), base no template `JLPimenta/arch-spring` | Herdado do projeto anterior (SmartMall); domínio refeito |
+| Banco | PostgreSQL via Docker, migrações com Liquibase | |
+| Frontend | React + TypeScript + Vite | |
 | UI | shadcn/ui + Tailwind CSS | Componentes em `src/components/ui` |
-| IA / triagem | Classificação por regras no backend, sempre revisável | Serviço de IA real é P2 e opcional |
+| Cliente | Aplicação web responsiva (PWA), sem app nativo | Escopo, seção 2 |
+| Pagamento | Provedor externo; nenhum dado de cartão armazenado | Escopo, seção 4.3 |
+| Localização | Celular do motorista durante a viagem ativa | Escopo, seção 4.2 |
 
 ## Estrutura do repositório
 
@@ -46,9 +50,10 @@ Não usar "plano" sozinho (ambíguo com Plano de ação) nem "agenda" como nome 
 /
 ├── backend/        Spring Boot (Maven)
 ├── frontend/       React + TypeScript (Vite)
-├── docs/           Documentação, evidências de teste e protótipo HTML5 de referência (docs/dist, somente leitura)
+├── docs/           Escopo do MVP e documentação por módulo
 ├── compose.yaml    PostgreSQL (e, opcionalmente, a stack completa)
 ├── .env.example    Variáveis de ambiente (copiar para .env)
+├── .claude/agents  Agentes do time (product-owner, developer, qa-tester)
 └── CLAUDE.md
 ```
 
@@ -68,13 +73,14 @@ docker compose --profile app up --build    # alternativa: stack completa em cont
 - Dados de demonstração entram por changeset Liquibase com `context:dev`. Nenhum passo manual de carga.
 - `.env` na raiz é opcional; o `compose.yaml` tem valores padrão. Nunca versionar `.env` nem senhas em `application-*.properties`.
 - `JAVA_HOME` deve apontar para a pasta do JDK, não para `bin`.
+- Portas configuráveis: `POSTGRES_PORT` (compose), `SERVER_PORT` (backend), `FRONTEND_PORT` e `API_URL` (Vite).
 
 ## Backend — padrões (arch-spring)
 
-Pacote raiz: `com.smartmall.ops`. Dois agrupamentos: `api` (camada web) e `domain` (regra de negócio e dados).
+Pacote raiz: `com.spacebus.ops`. Dois agrupamentos: `api` (camada web) e `domain` (regra de negócio e dados).
 
 ```
-com.smartmall.ops
+com.spacebus.ops
 ├── api
 │   ├── config/exception      ResponseError, FieldDataValidation, RestExceptionHandler
 │   ├── config/swagger        OpenAPI e redirecionamento de "/" para o Swagger
@@ -101,33 +107,34 @@ Para cada novo recurso, criar o conjunto completo:
 2. Changeset Liquibase em `resources/db/changes/<recurso>/AAAAMMDD-N-descricao.sql`, incluído em `db/changelog-master.xml`. `ddl-auto=validate`: o schema vem só do Liquibase.
 3. `model/<recurso>/<Recurso>Request` e `<Recurso>Response` (Lombok `@Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor`), validação com Bean Validation no Request.
 4. `I<Recurso>Mapper` com MapStruct (`@Mapper(componentModel = "spring")`) estendendo `IBaseMapper`.
-   - **Relações:** o Request recebe ids (`pisoId`). O mapper converte o id em entidade "referência" com `Referencias.porId(id, Piso::new)`; o serviço troca pela entidade real e lança `DomainException("Piso não encontrado.")` se o id não existir. Exemplo: `IEquipamentoMapper` + `EquipamentoService.preparar`.
+   - **Relações:** o Request recebe ids (`rotaId`). O mapper converte o id em entidade "referência" com `Referencias.porId(id, Rota::new)` (com `@Named` quando houver mais de uma relação); o serviço troca pela entidade real e lança `DomainException("Rota não encontrada.")` se o id não existir. Exemplo: `IViagemMapper` + `ViagemService.resolverReferencias`.
    - **Response:** expõe resumos (`Resumo`: id, nome, código), nunca a entidade relacionada inteira.
 5. `<Recurso>Repository` estendendo `BaseRepository<T>`.
 6. `I<Recurso>Service` estendendo `IBaseService<T>` e `<Recurso>Service` estendendo `BaseService<T>`. Regras de negócio em `validate()` ou em métodos próprios do serviço.
    - **`validate()` roda na criação e na edição** (`BaseService.update` também chama). Unicidade deve ignorar o próprio registro: `@Query("... and (:id is null or e.id <> :id)") boolean existeCodigo(String codigo, String id)`.
-   - **Exclusão de registro em uso:** sobrescrever `delete` e lançar `DomainException` com o motivo ("Equipamento com manutenção programada não pode ser excluído."). Não depender do erro genérico de chave estrangeira.
-   - **"Agora":** injetar `java.time.Clock` (bean em `TempoConfiguration`) e usar `LocalDateTime.now(clock)`, nunca `now()` direto. Nos testes, `Clock.fixed(...)`. O fuso da aplicação é `America/Araguaina` (variável `APP_FUSO_HORARIO`), definido no `main`.
+   - **Exclusão de registro em uso:** sobrescrever `delete` e lançar `DomainException` com o motivo ("Veículo com viagens não pode ser excluído. Inative o veículo."). Não depender do erro genérico de chave estrangeira.
+   - **"Agora":** injetar `java.time.Clock` (bean em `TempoConfiguration`) e usar `LocalDateTime.now(clock)`, nunca `now()` direto. Nos testes, `Clock.fixed(...)`. O fuso da aplicação é `America/Araguaina` (variável `APP_FUSO_HORARIO`), definido no `main`; ajustar quando a cidade do piloto for decidida.
 7. Controller estendendo `BaseController` (CRUD) ou `BaseSearchController` (somente leitura), com `@Tag` do Swagger.
 
 Regras:
 
-- Rotas com prefixo `/api`, recurso em pt-BR no singular, kebab-case (`/api/ocorrencia`, `/api/manutencao-preventiva`).
-- Transições de status (aprovar, atribuir, iniciar, concluir, encerrar) são endpoints explícitos (`POST /api/ocorrencia/{id}/aprovar`), não `PUT` genérico.
+- Rotas com prefixo `/api`, recurso em pt-BR no singular, kebab-case (`/api/viagem`, `/api/ponto-parada`).
+- Transições de status (publicar, suspender, cancelar, iniciar, encerrar) são endpoints explícitos (`POST /api/viagem/{id}/publicar`), não `PUT` genérico. O `*Request` de edição não carrega o status.
 - Erro de regra de negócio: lançar `DomainException` com mensagem curta em pt-BR. O `RestExceptionHandler` converte para `ResponseError`.
-- Toda mudança de status de ocorrência, tarefa e manutenção grava registro de histórico (RNF06): entidade, ação, responsável, data e resultado.
-- Autorização por perfil (Administrador, Supervisor, Funcionário) verificada no servidor, não só no frontend (RNF05).
+- Mudanças de status de reserva e pagamento gravam histórico (entidade, ação, responsável, data, resultado) a partir do módulo 3; o acesso administrativo deve ser registrado (escopo, seção 3).
+- **Módulos críticos** (reserva, pagamento, localização): concorrência e idempotência com teste. Nunca duas vendas da mesma vaga (trava/constraint no banco, não só checagem em memória); webhook de pagamento repetido não duplica efeito; serviço externo com timeout, retry limitado e fallback, sem mudar o estado real por falha de entrega.
+- Autorização por perfil verificada no servidor, não só no frontend.
 - Controllers não contêm regra de negócio; apenas delegam ao serviço.
-- Testes de serviço para as regras do fluxo principal (RNF09). Controllers com `@WebMvcTest`, importando `SecurityConfiguration` e `PasswordConfiguration`.
+- Testes de serviço para todas as regras. Controllers com `@WebMvcTest`, importando `SecurityConfiguration` e `PasswordConfiguration`.
 
 ## Limites de dados (obrigatório)
 
 Nenhum campo de entrada fica sem limite. Um valor sem limite passa pela tela, estoura a coluna do banco (erro 500) ou trava a interface.
 
-- **O mesmo número nas quatro camadas:** coluna do banco (`VARCHAR(n)`), `@Size(max = n)` no `*Request`, `.max(n)` no schema Zod e `maxLength={n}` no campo. No frontend, o valor vem de uma constante da feature (ex.: `features/checklists/limites.ts`), nunca de número solto.
+- **O mesmo número nas quatro camadas:** coluna do banco (`VARCHAR(n)`), `@Size(max = n)` no `*Request`, `.max(n)` no schema Zod e `maxLength={n}` no campo. No frontend, o valor vem de uma constante da feature (ex.: `features/rotas/limites.ts`), nunca de número solto.
 - **Texto:** `@Size(max)` com mensagem em pt-BR. Senha: máximo de 72 (limite do BCrypt).
 - **Número:** `@Min`/`@Max` no backend; `min`/`max` no `<input type="number">`.
-- **Listas:** `@Size(max)` (ex.: até 50 itens por checklist) e o botão de adicionar desabilitado ao atingir o limite.
+- **Listas:** `@Size(max)` (ex.: 2 a 30 pontos por rota) e o botão de adicionar desabilitado ao atingir o limite.
 - **Contador:** texto livre usa `LimitedInput` (`components/shared`), que exige `maxLength`. O contador fica sempre visível em campos únicos de destaque (ex.: Nome) e, em listas, aparece a partir de 80% do limite.
 - **Guardas automáticas, que devem continuar passando:**
   - backend: `LimitesDosRequestsTest` reprova qualquer `*Request` com texto ou lista sem `@Size(max)` ou número sem `@Max`;
@@ -137,7 +144,7 @@ Autenticação (`api/config/security`):
 
 - Sessão HTTP com cookie `JSESSIONID` (HttpOnly, SameSite=Strict). Sem JWT. CSRF desabilitado porque o frontend é same-origin via proxy.
 - Endpoints: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/sessao`. Todo o resto de `/api/**` exige sessão.
-- Perfis no enum `Perfil` (`ADMINISTRADOR`, `SUPERVISOR`, `FUNCIONARIO`), expostos como `ROLE_<PERFIL>`.
+- Perfis no enum `Perfil` (`ADMINISTRADOR`, `OPERADOR`, `MOTORISTA`, `PASSAGEIRO`), expostos como `ROLE_<PERFIL>`. Operação (veículo, rota, viagem, usuário) = `ADMINISTRADOR` e `OPERADOR` (`OPERACAO` em `SecurityConfiguration`).
 - Restrição por perfil de um recurso inteiro: `requestMatchers(...).hasAnyRole(...)` em `SecurityConfiguration`. **Não** usar `@PreAuthorize` na classe do controller: ele não alcança os endpoints herdados de `BaseController`/`BaseSearchController` (o Spring procura a anotação na classe que declara o método). `@PreAuthorize` só em métodos declarados no próprio controller. Toda restrição tem teste `@WebMvcTest` com o perfil bloqueado.
 - Usuário logado no controller: `@AuthenticationPrincipal UsuarioAutenticado`. Use o `id` dele como responsável no histórico.
 - Senhas sempre com BCrypt (`PasswordEncoder`); `UsuarioResponse` nunca expõe a senha.
@@ -153,7 +160,7 @@ frontend/src
 │   ├── ui/          Componentes do shadcn (gerados via CLI; editar com parcimônia)
 │   ├── layout/      AppShell, Sidebar, Header, PageHeader
 │   └── shared/      Componentes reutilizáveis do domínio (ver lista abaixo)
-├── features/<modulo>/   ocorrencias, central, tarefas, equipamentos, manutencao, historico, auth
+├── features/<modulo>/   auth, veiculos, rotas, viagens (próximos: busca, reservas, localizacao…)
 │   ├── components/  Componentes específicos do módulo
 │   ├── api.ts       Funções de acesso à API do módulo
 │   ├── hooks.ts     Hooks do TanStack Query
@@ -181,7 +188,7 @@ frontend/src
 | `SemResultado` | Lista filtrada sem resultado, com "Limpar filtros" |
 | `PageHeader`, `EmptyState`, `ErrorState`, `SimulatedBadge` | Estrutura e estados de tela |
 
-Uma tela de cadastro nova segue o modelo de `pages/equipamento-form-page.tsx`: `useAcoesCadastro` + `RegistroLoader` + `<XForm>` com `CadastroForm`. A listagem segue `pages/equipamentos-page.tsx`.
+Uma tela de cadastro nova segue o modelo de `pages/veiculo-form-page.tsx`: `useAcoesCadastro` + `RegistroLoader` + `<XForm>` com `CadastroForm`. A listagem segue `pages/veiculos-page.tsx`. Lista de itens editável: `features/rotas/components/pontos-editor.tsx`.
 
 Componentização:
 
@@ -189,7 +196,7 @@ Componentização:
 - Componente com mais de ~150 linhas ou mais de uma responsabilidade deve ser dividido.
 - Antes de criar componente, verificar se já existe em `ui/` ou `shared/`. Adicionar componentes shadcn com `npx shadcn@latest add <nome>`.
 - Props tipadas com `type`; sem `any`.
-- **Menu lateral** (`components/layout/navigation.ts`): grupos (Operação, Manutenção, Cadastros); só entra item de módulo já implementado.
+- **Menu lateral** (`components/layout/navigation.ts`): grupos (Operação, Cadastros); só entra item de módulo já implementado.
   - Cada item declara `perfis`, iguais aos do `SecurityConfiguration`. Item **sem** `perfis` libera todos os perfis.
   - A rota usa `<RequirePerfil rota="...">`, que consulta `podeAcessar`; rota fora do menu é negada por padrão.
   - A ordem dos itens define a tela inicial de cada perfil.
@@ -199,14 +206,13 @@ Componentização:
 - Sessão: `useSessao()` (`features/auth/hooks.ts`). Rotas internas ficam sob `RequireAuth`. Um 401 em qualquer chamada limpa a sessão e leva ao login (`lib/query-client.ts`).
 - Chamadas HTTP só via `lib/api.ts` (prefixo `/api`, erros como `ApiError`; upload com `api.upload` e `FormData`). Listagens paginadas retornam `Page<T>` (`content` + `page`).
 - Status e prioridade sempre pelos componentes compartilhados, para manter cor e texto consistentes. Cada situação tem um tom próprio (`lib/tons.ts`: `seloDoTom`, `marcadorDoTom`, `pontoDoTom`), o mesmo no selo, no calendário e na legenda; duas situações não dividem o mesmo tom.
-- Cores por tokens CSS do tema shadcn (`--primary`, etc.), nunca hex solto em componente. Paleta base do protótipo: navy `#061a37`, azul `#087cbe`, ciano `#36c6ea`, verde `#24ae72`, vermelho `#ec545b`, âmbar `#f0a633`.
+- Cores por tokens CSS do tema shadcn (`--primary`, etc.), nunca hex solto em componente. Paleta base: navy `#061a37`, azul `#087cbe`, ciano `#36c6ea`, verde `#24ae72`, vermelho `#ec545b`, âmbar `#f0a633`.
 
-HTML5 e acessibilidade (tecnologia sorteada, seção 9 da documentação — é critério de avaliação):
+HTML5 e acessibilidade (o passageiro usa pelo celular; PWA responsiva):
 
 - `index.html` com `<!DOCTYPE html>`, `lang="pt-BR"`, `charset` e `viewport`.
 - Estrutura semântica: `header`, `nav`, `main`, `section`, `footer`, hierarquia de títulos correta (um `h1` por página).
 - Formulários com `label` associado, `type` adequado, `required` quando aplicável e **sempre** `maxLength` (ou `min`/`max` em números), além da validação Zod. Ver "Limites de dados".
-- Central de Controle: diagrama do piso em SVG inline, com marcadores focáveis e operáveis por teclado.
 - Layout responsivo: sidebar no desktop, navegação compacta no mobile.
 
 Estados obrigatórios em toda tela com dados: carregando (Skeleton), vazio, erro e sucesso.
@@ -216,9 +222,9 @@ Estados obrigatórios em toda tela com dados: carregando (Skeleton), vazio, erro
 Objetivo: o usuário vê o máximo de informação útil sem rolar, sem áreas vazias desperdiçadas.
 
 - **Largura:** formulários e listas usam até `max-w-6xl`. Campos curtos por natureza (nome, código) podem ser limitados (ex.: `max-w-xl`), mas o contêiner não. Não deixar mais da metade da tela vazia no desktop.
-- **Itens repetidos** (perguntas, linhas, registros) ficam em **linhas compactas tipo tabela** no desktop:
+- **Itens repetidos** (pontos de parada, linhas, registros) ficam em **linhas compactas tipo tabela** no desktop:
   - uma linha por item e rótulos uma vez só, no cabeçalho;
-  - cada campo mantém rótulo acessível (`md:sr-only`) e cada linha é um `<fieldset>` com `<legend>` (ex.: `checklists/components/item-grid.ts`).
+  - cada campo mantém rótulo acessível (`md:sr-only`) e cada linha é um `<fieldset>` com `<legend>` (ex.: `rotas/components/ponto-row.tsx`).
   - No celular, as linhas viram cartões empilhados com rótulos visíveis.
 - **Ações de lista crescente no topo:** "Adicionar …" fica no cabeçalho da lista (ao lado do título com a contagem `n/limite`), nunca no fim. O item novo recebe o foco e entra na área visível.
 - **Formulário longo:** barra de ações fixa no rodapé (`sticky bottom-0`), com Cancelar e Salvar sempre visíveis. Usar `FormActions` (`components/shared`).
@@ -236,18 +242,14 @@ Objetivo: o usuário vê o máximo de informação útil sem rolar, sem áreas v
   - **Busca de texto:** `contem()` ignora maiúsculas e acentos.
 - **Lista vazia:** "Nenhum … cadastrado" (`EmptyState` com o botão Novo) é diferente de "Nenhum resultado para os filtros." (`SemResultado`, com Limpar filtros).
 - **Linha clicável:** `LinhaClicavel` abre o registro em edição. Botões e links da linha mantêm a própria ação. Para o teclado, cada linha mantém o link "Editar …".
-- **Item de lista clicável (fora de tabela):** a área inteira abre o registro. O link principal recebe `after:absolute after:inset-0` (o item é `relative`), e os outros links e botões do item, `relative z-10`. Referência: `features/tarefas/components/tarefa-item.tsx`. No E2E, clicar numa posição do item (`item.click({ position })`), não no texto, que fica sob o link.
+- **Item de lista clicável (fora de tabela):** a área inteira abre o registro. O link principal recebe `after:absolute after:inset-0` (o item é `relative`), e os outros links e botões do item, `relative z-10`. No E2E, clicar numa posição do item (`item.click({ position })`), não no texto, que fica sob o link.
 
 ## Navegação e fluxo
 
 O usuário nunca deve se perder.
 
-- **Origem:** todo link para uma tela de cadastro leva a origem (`state={useOrigemAtual()}`; `BotaoNovo` e `LinhaClicavel` já levam). O Cancelar/Voltar retorna para lá (`useVoltarPara`), com filtros e dia selecionado. Sem origem (URL direta), volta para a listagem.
-- **Telas do mesmo fluxo se ligam nos dois sentidos.** Na manutenção:
-  - em Tarefas, a origem da tarefa ("Manutenção programada") abre a manutenção programada;
-  - a manutenção programada tem "Ver em Tarefas", que abre Tarefas no dia da próxima;
-  - Tarefas tem "Programar manutenção".
-  - Estados navegáveis ficam na URL (ex.: `/tarefas?dia=AAAA-MM-DD`).
+- **Origem:** todo link para uma tela de cadastro leva a origem (`state={useOrigemAtual()}`; `BotaoNovo` e `LinhaClicavel` já levam). O Cancelar/Voltar retorna para lá (`useVoltarPara`), com os filtros. Sem origem (URL direta), volta para a listagem.
+- **Telas do mesmo fluxo se ligam nos dois sentidos** (ex.: da reserva para a viagem e da viagem para as reservas). Estados navegáveis ficam na URL (ex.: `/operacao/viagens?dia=AAAA-MM-DD&situacao=PUBLICADA`).
 - **Ao criar um módulo novo:** definir de onde o usuário chega e para onde vai, e testar o caminho de ida e volta no E2E.
 
 ## Telas de cadastro e edição (obrigatório)
@@ -258,16 +260,17 @@ Toda tela de cadastro ou edição segue este comportamento:
 - **Salvar:** persiste, mostra a mensagem de sucesso e **permanece na mesma tela**.
   - **Cadastro novo:** depois de salvar, a tela vira a edição do registro criado (`navigate(<lista>/<id>, { replace: true })`), para que o próximo Salvar atualize em vez de duplicar.
   - **Valores salvos:** viram a nova base do formulário (`form.reset(salvos)`). Depois de salvar, Cancelar não pede confirmação.
-  - **Ordem dos passos:** o `reset` roda num `useEffect` depois do envio, nunca dentro do `handleSubmit`, porque o RHF sobrescreve o estado ao concluir. A mensagem de sucesso sai só depois do `reset` (via `useEffectEvent`), para nunca existir "salvo" com alteração pendente. Referência: `features/checklists/components/checklist-form.tsx`.
+  - **Ordem dos passos:** o `reset` roda num `useEffect` depois do envio, nunca dentro do `handleSubmit`, porque o RHF sobrescreve o estado ao concluir. A mensagem de sucesso sai só depois do `reset` (via `useEffectEvent`), para nunca existir "salvo" com alteração pendente. Referência: `components/shared/cadastro-form.tsx`.
   - **`<form data-alterado={isDirty}>`:** expõe o estado de alterações pendentes aos testes.
   - **Erro ao salvar:** a tela, os dados digitados e o estado de alterações pendentes são mantidos.
-- **Componentes:** `CadastroForm` implementa tudo isso; `useAcoesCadastro` (`lib/cadastro.ts`) fornece as ações (salvar, troca para edição, mensagem de sucesso, erro). Registro que não pode ser editado (ex.: plano encerrado): `somenteLeitura`.
-- **Ação principal além de Salvar** (ex.: "Enviar para análise"): prop `acaoExtra` do `CadastroForm`; Salvar passa a ser secundário (`outline`). Referência: `features/tarefas/components/execucao-form.tsx`.
+- **Componentes:** `CadastroForm` implementa tudo isso; `useAcoesCadastro` (`lib/cadastro.ts`) fornece as ações (salvar, troca para edição, mensagem de sucesso, erro). Registro que não pode ser editado (ex.: viagem cancelada): `somenteLeitura`.
+- **Ação principal além de Salvar**: prop `acaoExtra` do `CadastroForm`; Salvar passa a ser secundário (`outline`).
+- **Transições de situação na tela de edição** (ex.: Publicar, Suspender, Cancelar viagem): bloco "Situação" no topo do formulário, cada ação com confirmação e bloqueada enquanto houver alterações não salvas. Referência: `features/viagens/components/viagem-acoes.tsx`.
 - **Testes E2E de toda tela de cadastro:** salvar novo (vira edição e não duplica), salvar edição, Cancelar sem e com alterações, voltar no diálogo, Descartar e Cancelar depois de salvar.
 - **Sincronizar o teste depois de Salvar:**
   - aguardar a resposta da API (`page.waitForResponse`) e `data-alterado="false"`;
   - não confiar só no toast: o de uma gravação anterior pode continuar na tela e o teste seguir antes da hora;
-  - modelo: `salvar()` em `e2e/support/checklists.ts`.
+  - modelo: `salvarCadastro()` em `e2e/support/cadastros.ts`.
 
 ## Texto de interface
 
@@ -275,7 +278,7 @@ Toda tela de cadastro ou edição segue este comportamento:
 - Sem frases de efeito, saudações, explicações óbvias ou parágrafos descritivos na tela.
 - Sem texto de ajuda quando o rótulo já basta. Descrição de página: no máximo uma linha, e só se necessária.
 - Mensagens de erro dizem o que fazer: "Informe a localização", não "Ops! Algo deu errado".
-- Dados simulados (rotas, posições, tempos, classificação sugerida) recebem o `SimulatedBadge` ("Simulado") — exigência RNF07 — sem textos longos de aviso.
+- Dados simulados ou aproximados (posições, ETA, reservas de teste) recebem o `SimulatedBadge` ("Simulado"), sem textos longos de aviso. Localização desatualizada é sinalizada, nunca escondida (escopo 4.2).
 - Não apresentar como implementada uma funcionalidade planejada.
 
 O mesmo vale para código e documentação: comentários só quando explicam o porquê; README e docs objetivos.
@@ -299,8 +302,8 @@ Frontend (`npm run test:e2e`, Playwright em `frontend/e2e`):
 - Todos rodam em `desktop` e `mobile`; tratar a gaveta do menu no celular.
 - Estados difíceis de reproduzir (401, 500) são simulados com `page.route`.
 - Testes não podem depender de dados criados por outro teste. Se precisar criar dados, criar no próprio teste com nome único.
-- Testes com vários perfis: a página entra com um perfil e os dados de outro perfil são preparados pela API (`apiComo` em `e2e/support/tarefas.ts`).
-- Testes em paralelo podem criar registros parecidos no mesmo dia: localizar o registro do teste pelo id (ex.: `[href="/tarefas/<id>"]`), não só pelo texto.
+- Testes com vários perfis: a página entra com um perfil e os dados de outro perfil são preparados pela API.
+- Testes em paralelo podem criar registros parecidos: localizar o registro do teste pelo id (ex.: `a[href$="<id>"]`), não só pelo texto. Viagens de teste usam partida aleatória no futuro (`partidaUnica` em `e2e/viagens.spec.ts`) para não colidir na regra "mesmo veículo, mesmo horário".
 
 Testes instáveis (flaky) são defeito, não azar. Regras:
 
@@ -312,7 +315,7 @@ Testes instáveis (flaky) são defeito, não azar. Regras:
   - `expect.poll` para estilos com transição.
 - **Mensagens repetíveis (toasts):** não usá-las como prova de que *esta* ação terminou.
 - **Dados da seed são somente leitura nos testes.** Testes que mexem num registro da seed não salvam; os que precisam salvar criam o próprio registro e o apagam no `afterEach`.
-- **Registro que a regra de negócio não deixa excluir** (ex.: manutenção programada com tarefa executada): o teste marca o registro com `marcaUnica()` (`E2E-…`) nas observações e o apaga com `DELETE /api/teste/e2e?marca=` (`LimpezaE2EController`: só no perfil `dev`, só Administrador, só marcas `E2E-`). Helper: `descartarProgramada` em `e2e/support/tarefas.ts`.
+- **Registro que a regra de negócio não deixa excluir** (ex.: viagem cancelada): use nome/descrição com prefixo `E2E` e partida aleatória. Um endpoint de limpeza por marca (só no perfil dev, só Administrador) entra quando o volume de dados de teste atrapalhar.
 - **Ambiente estável:**
   - não rodar o E2E enquanto containers reiniciam;
   - não compilar o backend (`mvnw test`/`compile`) com o backend dev no ar durante o E2E: o devtools recarrega no meio da compilação e o login quebra;
@@ -322,16 +325,19 @@ Testes instáveis (flaky) são defeito, não azar. Regras:
 
 ## Escopo e prioridade
 
-Implementar na ordem: P0 completo antes de qualquer P1.
+Ordem dos módulos (detalhe em `docs/escopo-mvp.md`). Um módulo só começa depois do anterior aprovado pelo QA.
 
-- P0: RF01 Autenticação por perfil, RF02 Dashboard, RF03 Ocorrências, RF04 Triagem com revisão humana, RF05 Tarefas, RF06 Central de Controle, RF08 Manutenção preventiva.
-- P1: RF07 Rota ilustrativa, RF09 Checklist, RF10 Alertas, RF11 Histórico.
-- P2: RF12 Análise de recorrência, serviço de IA real.
+1. **Cadastro operacional** (veículo, rota, viagem) — entregue para teste.
+2. **Consulta de viagens** pelo passageiro (origem, destino, data; detalhe da rota; mensagem sem resultado). Endpoint próprio de leitura, só viagens `PUBLICADA` com partida futura.
+3. **Reserva e pagamento** (código, bloqueio temporário, provedor externo, sem dupla venda).
+4. **Localização** da viagem ativa (celular do motorista, hora da última atualização, dado desatualizado sinalizado).
+5. **Notificações** (aplicação + WhatsApp/e-mail com consentimento).
+6. **Indicadores básicos** (viagens, lugares vendidos, ocupação por horário).
 
-Fluxo de status da ocorrência: `REGISTRADA → EM_ANALISE → APROVADA → EM_EXECUCAO → ENCERRADA`. A sugestão de categoria, prioridade e equipe nunca é aplicada sem aprovação de Supervisor ou Administrador. Encerramento exige resolução registrada.
+Fora do MVP: ver `docs/escopo-mvp.md`. Decisões pendentes (cidade, provedor de pagamento, assento numerado, prazo de bloqueio…) não são inventadas: registre a premissa adotada no doc do módulo.
 
 ## Git
 
-- Commits pequenos, mensagem em pt-BR no imperativo (`Adiciona endpoint de aprovação de ocorrência`).
+- Commits pequenos, mensagem em pt-BR no imperativo (`Adiciona publicação de viagem`).
 - Branch por funcionalidade: `feat/<rf>-<descricao>`, `fix/<descricao>`.
 - Não commitar `.env`, `node_modules/`, `target/`, `.idea/`, `frontend/dist/`.

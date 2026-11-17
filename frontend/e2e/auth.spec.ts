@@ -9,7 +9,7 @@ async function navegacao(page: Page, isMobile: boolean) {
 
 test.describe('Tela de login', () => {
   test('rota interna sem sessão leva ao login', async ({ page }) => {
-    await page.goto('/central')
+    await page.goto('/operacao/viagens')
 
     await expect(page).toHaveURL(/\/login$/)
     await expect(page.getByRole('heading', { level: 1, name: 'Entrar' })).toBeVisible()
@@ -44,7 +44,7 @@ test.describe('Tela de login', () => {
   test('senha errada mostra erro e mantém no login', async ({ page }) => {
     await page.goto('/login')
 
-    await preencherLogin(page, contas.supervisor.email, 'senha-errada')
+    await preencherLogin(page, contas.operador.email, 'senha-errada')
 
     await expect(page.getByRole('alert')).toHaveText('E-mail ou senha inválidos.')
     await expect(page).toHaveURL(/\/login$/)
@@ -53,7 +53,7 @@ test.describe('Tela de login', () => {
   test('e-mail inexistente mostra a mesma mensagem de senha errada', async ({ page }) => {
     await page.goto('/login')
 
-    await preencherLogin(page, 'ninguem@smartmall.local', SENHA_DEMO)
+    await preencherLogin(page, 'ninguem@spacebus.local', SENHA_DEMO)
 
     await expect(page.getByRole('alert')).toHaveText('E-mail ou senha inválidos.')
   })
@@ -85,64 +85,68 @@ test.describe('Login por perfil', () => {
 })
 
 test.describe('Permissões por perfil', () => {
-  test('Administrador e Supervisor acessam a Central de Controle', async ({ page, isMobile }) => {
-    for (const conta of [contas.administrador, contas.supervisor]) {
+  test('Administrador e Operador acessam Viagens, Rotas e Veículos', async ({ page, isMobile }) => {
+    for (const conta of [contas.administrador, contas.operador]) {
       await entrar(page, conta)
 
-      await expect(page).toHaveURL(/\/central$/)
-      await expect(page.getByRole('heading', { level: 1, name: 'Central de Controle' })).toBeVisible()
-      await expect((await navegacao(page, isMobile)).getByRole('link', { name: 'Central de Controle' })).toBeVisible()
+      await expect(page).toHaveURL(/\/operacao\/viagens$/)
+      await expect(page.getByRole('heading', { level: 1, name: 'Viagens' })).toBeVisible()
+      const menu = await navegacao(page, isMobile)
+      for (const item of ['Viagens', 'Rotas', 'Veículos']) {
+        await expect(menu.getByRole('link', { name: item })).toBeVisible()
+      }
 
       await page.keyboard.press('Escape')
       await sair(page, conta)
     }
   })
 
-  test('Funcionário entra em Tarefas, não vê a Central no menu e é bloqueado pela URL', async ({ page, isMobile }) => {
-    await entrar(page, contas.funcionario)
+  for (const conta of [contas.motorista, contas.passageiro]) {
+    test(`${conta.perfil} não vê a operação no menu e é bloqueado pela URL`, async ({ page }) => {
+      await entrar(page, conta)
 
-    await expect(page).toHaveURL(/\/tarefas$/)
-    const menu = await navegacao(page, isMobile)
-    await expect(menu.getByRole('link', { name: 'Tarefas' })).toBeVisible()
-    await expect(menu.getByRole('link', { name: 'Central de Controle' })).toHaveCount(0)
-    for (const restrito of ['Em análise', 'Manutenções programadas', 'Modelos de checklist', 'Equipamentos', 'Equipes']) {
-      await expect(menu.getByRole('link', { name: restrito })).toHaveCount(0)
-    }
+      await expect(page.getByText('Nenhum módulo disponível para o seu perfil.')).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Viagens' })).toHaveCount(0)
 
-    await page.goto('/central')
-    await expect(page.getByText('Acesso não permitido para o seu perfil.')).toBeVisible()
-  })
+      for (const rota of ['/operacao/viagens', '/cadastros/rotas/nova', '/cadastros/veiculos']) {
+        await page.goto(rota)
+        await expect(page.getByText('Acesso não permitido para o seu perfil.')).toBeVisible()
+      }
+      expect((await page.request.get('/api/viagem')).status()).toBe(403)
+    })
+  }
 })
 
 test.describe('Sessão', () => {
   test('volta à rota de origem depois do login', async ({ page }) => {
-    await page.goto('/central')
+    await page.goto('/operacao/viagens')
     await expect(page).toHaveURL(/\/login$/)
 
-    await preencherLogin(page, contas.supervisor.email, SENHA_DEMO)
+    await preencherLogin(page, contas.operador.email, SENHA_DEMO)
 
-    await expect(page).toHaveURL(/\/central$/)
+    await expect(page).toHaveURL(/\/operacao\/viagens$/)
   })
 
   test('ignora rota de origem não permitida ao perfil', async ({ page }) => {
-    await page.goto('/central')
+    await page.goto('/operacao/viagens')
 
-    await preencherLogin(page, contas.funcionario.email, SENHA_DEMO)
+    await preencherLogin(page, contas.passageiro.email, SENHA_DEMO)
 
-    // Vai para o primeiro módulo permitido (Tarefas), não para a Central.
-    await expect(page).toHaveURL(/\/tarefas$/)
+    // Sem módulo permitido, vai para o início, não para a rota de origem.
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByText('Nenhum módulo disponível para o seu perfil.')).toBeVisible()
   })
 
   test('sessão continua após recarregar a página', async ({ page }) => {
-    await entrar(page, contas.supervisor)
+    await entrar(page, contas.operador)
 
     await page.reload()
 
-    await expect(menuDoUsuario(page, contas.supervisor)).toBeVisible()
+    await expect(menuDoUsuario(page, contas.operador)).toBeVisible()
   })
 
   test('cookie de sessão é HttpOnly e SameSite=Strict', async ({ page, context }) => {
-    await entrar(page, contas.supervisor)
+    await entrar(page, contas.operador)
 
     const cookie = (await context.cookies()).find((c) => c.name === 'JSESSIONID')
     expect(cookie?.httpOnly).toBe(true)
@@ -155,24 +159,24 @@ test.describe('Sessão', () => {
 
     await page.goto('/login')
 
-    await expect(page).toHaveURL(/\/central$/)
+    await expect(page).toHaveURL(/\/operacao\/viagens$/)
   })
 
   test('sair encerra a sessão e protege as rotas novamente', async ({ page }) => {
-    await entrar(page, contas.supervisor)
+    await entrar(page, contas.operador)
 
-    await sair(page, contas.supervisor)
-    await page.goto('/central')
+    await sair(page, contas.operador)
+    await page.goto('/operacao/viagens')
 
     await expect(page).toHaveURL(/\/login$/)
     expect((await page.request.get('/api/auth/sessao')).status()).toBe(401)
   })
 
   test('sair pede confirmação e cancelar mantém a sessão', async ({ page }) => {
-    await entrar(page, contas.supervisor)
+    await entrar(page, contas.operador)
     const url = page.url()
 
-    const dialogo = await pedirSaida(page, contas.supervisor)
+    const dialogo = await pedirSaida(page, contas.operador)
     await expect(dialogo.getByRole('button', { name: 'Cancelar' })).toBeFocused()
     await dialogo.getByRole('button', { name: 'Cancelar' }).click()
 
@@ -193,16 +197,16 @@ test.describe('Sessão', () => {
   })
 
   test('menu continua utilizável depois de cancelar a saída', async ({ page }) => {
-    await entrar(page, contas.supervisor)
+    await entrar(page, contas.operador)
 
-    const dialogo = await pedirSaida(page, contas.supervisor)
+    const dialogo = await pedirSaida(page, contas.operador)
     await dialogo.getByRole('button', { name: 'Cancelar' }).click()
 
-    await sair(page, contas.supervisor)
+    await sair(page, contas.operador)
   })
 
   test('sessão expirada no servidor leva ao login', async ({ page, context }) => {
-    await entrar(page, contas.supervisor)
+    await entrar(page, contas.operador)
 
     await context.clearCookies()
     await page.reload()
@@ -211,18 +215,18 @@ test.describe('Sessão', () => {
   })
 
   test('401 numa chamada da tela encerra a sessão no cliente', async ({ page }) => {
-    await page.route('**/api/piso**', (route) =>
+    await page.route('**/api/viagem**', (route) =>
       route.fulfill({ status: 401, json: { status: 401, message: 'Sessão expirada. Entre novamente.' } }),
     )
     await page.goto('/login')
 
-    await preencherLogin(page, contas.supervisor.email, SENHA_DEMO)
+    await preencherLogin(page, contas.operador.email, SENHA_DEMO)
 
     await expect(page).toHaveURL(/\/login$/)
     await expect(page.getByRole('heading', { level: 1, name: 'Entrar' })).toBeVisible()
   })
 
   test('API sem sessão responde 401', async ({ page }) => {
-    expect((await page.request.get('/api/piso')).status()).toBe(401)
+    expect((await page.request.get('/api/viagem')).status()).toBe(401)
   })
 })

@@ -7,7 +7,7 @@ export function AppHeader() {
     <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
       <SidebarTrigger />
       <Separator orientation="vertical" className="h-4" />
-      <span className="truncate text-sm text-muted-foreground">Capim Dourado Shopping</span>
+      <span className="truncate text-sm text-muted-foreground">Piloto · Transporte por van</span>
       <div className="ml-auto">
         <UserMenu />
       </div>

@@ -1,4 +1,4 @@
-import { ClipboardCheckIcon, ClipboardListIcon, ListChecksIcon, MapIcon, RepeatIcon, UsersIcon, WrenchIcon, type LucideIcon } from 'lucide-react'
+import { BusIcon, CalendarClockIcon, RouteIcon, type LucideIcon } from 'lucide-react'
 import { temPerfil } from '@/features/auth/permissoes'
 import type { Perfil } from '@/features/auth/types'
 
@@ -12,36 +12,25 @@ export type NavItem = {
 
 export type NavGrupo = { titulo: string; itens: readonly NavItem[] }
 
-const GESTAO = ['ADMINISTRADOR', 'SUPERVISOR'] as const satisfies readonly Perfil[]
+/** Mantêm frota, rotas e viagens da transportadora. Igual a OPERACAO no SecurityConfiguration. */
+const OPERACAO = ['ADMINISTRADOR', 'OPERADOR'] as const satisfies readonly Perfil[]
 
 /**
  * Só entram aqui módulos já implementados. Perfis iguais aos do backend (SecurityConfiguration).
  * A ordem define o destino inicial: cada perfil cai no primeiro item permitido.
  *
- * Fluxo (docs/modulo-manutencao.md, Glossário): Operação é o dia a dia (Tarefas é onde chegam os dois
- * fluxos: manutenção programada e, no futuro, chamado). Planejamento define o que vira tarefa.
+ * Fluxo B do escopo (docs/escopo-mvp.md): cadastra veículo e rota, depois programa e publica viagens.
  */
 export const navGrupos: readonly NavGrupo[] = [
   {
     titulo: 'Operação',
-    itens: [
-      { title: 'Central de Controle', to: '/central', icon: MapIcon, perfis: GESTAO },
-      { title: 'Tarefas', to: '/tarefas', icon: ListChecksIcon },
-      { title: 'Análise de Tarefas', to: '/analise', icon: ClipboardCheckIcon, perfis: GESTAO },
-    ],
-  },
-  {
-    titulo: 'Planejamento',
-    itens: [
-      { title: 'Manutenções programadas', to: '/planejamento/manutencoes-programadas', icon: RepeatIcon, perfis: GESTAO },
-      { title: 'Modelos de checklist', to: '/planejamento/modelos-checklist', icon: ClipboardListIcon, perfis: GESTAO },
-    ],
+    itens: [{ title: 'Viagens', to: '/operacao/viagens', icon: CalendarClockIcon, perfis: OPERACAO }],
   },
   {
     titulo: 'Cadastros',
     itens: [
-      { title: 'Equipamentos', to: '/cadastros/equipamentos', icon: WrenchIcon, perfis: GESTAO },
-      { title: 'Equipes', to: '/cadastros/equipes', icon: UsersIcon, perfis: GESTAO },
+      { title: 'Rotas', to: '/cadastros/rotas', icon: RouteIcon, perfis: OPERACAO },
+      { title: 'Veículos', to: '/cadastros/veiculos', icon: BusIcon, perfis: OPERACAO },
     ],
   },
 ]
@@ -59,7 +48,7 @@ export function itensPermitidos(perfil: Perfil | undefined): readonly NavItem[] 
   return todosItens.filter((item) => temPerfil(perfil, item.perfis))
 }
 
-/** Item de menu que cobre a rota (inclui subrotas, ex.: /planejamento/modelos-checklist/novo). */
+/** Item de menu que cobre a rota (inclui subrotas, ex.: /cadastros/rotas/nova). */
 export function itemDaRota(to: string): NavItem | undefined {
   return todosItens.find((item) => to === item.to || to.startsWith(`${item.to}/`))
 }

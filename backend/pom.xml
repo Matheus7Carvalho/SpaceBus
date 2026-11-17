@@ -9,11 +9,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.smartmall</groupId>
-    <artifactId>smartmall-ops</artifactId>
+    <groupId>com.spacebus</groupId>
+    <artifactId>spacebus-api</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>smartmall-ops</name>
-    <description>SmartMall Ops AI - API</description>
+    <name>spacebus-api</name>
+    <description>SpaceBus - API</description>
 
     <properties>
         <java.version>21</java.version>

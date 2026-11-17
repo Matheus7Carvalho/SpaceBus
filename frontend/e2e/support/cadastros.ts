@@ -2,20 +2,20 @@ import { expect, type Page } from '@playwright/test'
 
 /**
  * Helpers genéricos das telas de cadastro (CadastroForm): salvar e permanecer, voltar à lista,
- * diálogo de descarte e limpeza via API. Mesma sincronização de e2e/support/checklists.ts.
+ * diálogo de descarte e limpeza via API.
  */
 
 /** Ids fixos da seed de dev (backend/src/main/resources/db/changes). */
 export const SEED = {
-  pisoL1: '6f1c0a52-0001-4c1e-9a10-000000000001',
-  equipamentoElevadorE1: '5a1e0000-0001-4e00-9000-000000000001',
-  equipamentoBombaB01: '5a1e0000-0001-4e00-9000-000000000005',
-  checklistElevador: '7c3a9e20-0001-4b1d-9c00-000000000001',
-  equipeHidraulica: '3e9a0000-0001-4d00-8000-000000000002',
-  equipeClimatizacao: '3e9a0000-0001-4d00-8000-000000000001',
-  equipeElevadores: '3e9a0000-0001-4d00-8000-000000000003',
-  programadaElevadorSemanal: '4c2b0000-0001-4f00-a000-000000000001',
+  rotaCentroAeroporto: '8b2c0000-0001-4d00-9000-000000000001',
+  vanSprinter: '9a1b0000-0001-4c00-8000-000000000001',
+  vanMaster: '9a1b0000-0001-4c00-8000-000000000002',
+  viagemPublicada: '7d3e0000-0001-4e00-a000-000000000001',
+  viagemCancelada: '7d3e0000-0001-4e00-a000-000000000004',
 } as const
+
+/** Prefixo dos registros criados pelos testes (limpeza no afterEach). */
+export const PREFIXO_E2E = 'E2E'
 
 export function sufixoUnico(tamanho = 6) {
   return (Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(-tamanho).toUpperCase()

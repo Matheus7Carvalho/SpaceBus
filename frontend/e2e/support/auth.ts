@@ -2,9 +2,10 @@ import { expect, type Page } from '@playwright/test'
 
 /** Contas da seed de dev (backend/src/main/resources/db/changes/usuario). */
 export const contas = {
-  administrador: { nome: 'Rafael Mendes', email: 'admin@smartmall.local', perfil: 'Administrador' },
-  supervisor: { nome: 'Ana Souza', email: 'supervisor@smartmall.local', perfil: 'Supervisor' },
-  funcionario: { nome: 'João Costa', email: 'funcionario@smartmall.local', perfil: 'Funcionário' },
+  administrador: { nome: 'Rafael Mendes', email: 'admin@spacebus.local', perfil: 'Administrador' },
+  operador: { nome: 'Ana Operadora', email: 'operador@spacebus.local', perfil: 'Operador' },
+  motorista: { nome: 'João Costa', email: 'motorista@spacebus.local', perfil: 'Motorista' },
+  passageiro: { nome: 'Paula Lima', email: 'passageiro@spacebus.local', perfil: 'Passageiro' },
 } as const
 
 export const SENHA_DEMO = 'demo123'

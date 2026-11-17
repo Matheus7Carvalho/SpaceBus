@@ -1,4 +1,4 @@
-import { Building2Icon } from 'lucide-react'
+import { BusIcon } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router'
 import {
   Sidebar,
@@ -24,8 +24,8 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <Building2Icon className="size-5 shrink-0 text-sidebar-primary" aria-hidden />
-          <span className="truncate font-semibold group-data-[collapsible=icon]:hidden">SmartMall Ops</span>
+          <BusIcon className="size-5 shrink-0 text-sidebar-primary" aria-hidden />
+          <span className="truncate font-semibold group-data-[collapsible=icon]:hidden">SpaceBus</span>
         </div>
       </SidebarHeader>
       <SidebarContent>

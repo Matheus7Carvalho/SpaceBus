@@ -1,4 +1,4 @@
-import { Building2Icon } from 'lucide-react'
+import { BusIcon } from 'lucide-react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import { LoginForm } from '@/features/auth/components/login-form'
 import { podeAcessar } from '@/components/layout/navigation'
@@ -21,7 +21,7 @@ export function LoginPage() {
     <div className="grid min-h-svh lg:grid-cols-2">
       <aside className="hidden flex-col justify-between bg-sidebar p-10 text-sidebar-foreground lg:flex">
         <Marca />
-        <p className="text-sm text-sidebar-foreground/70">Capim Dourado Shopping</p>
+        <p className="text-sm text-sidebar-foreground/70">Encontre, acompanhe e reserve sua viagem de van.</p>
       </aside>
       <main className="flex items-center justify-center p-6">
         <div className="grid w-full max-w-sm gap-6">
@@ -41,8 +41,8 @@ export function LoginPage() {
 function Marca() {
   return (
     <div className="flex items-center gap-2 font-semibold">
-      <Building2Icon className="size-6 text-sidebar-primary" aria-hidden />
-      SmartMall Ops AI
+      <BusIcon className="size-6 text-sidebar-primary" aria-hidden />
+      SpaceBus
     </div>
   )
 }

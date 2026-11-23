@@ -1,5 +1,6 @@
 package com.spacebus.ops.domain.model.rota;
 
+import com.spacebus.ops.domain.entity.enums.TipoRota;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -34,6 +35,14 @@ public class RotaRequest {
     @NotBlank(message = "Informe o destino.")
     @Size(max = 100, message = "O destino deve ter até 100 caracteres.")
     private String destino;
+
+    @NotNull(message = "Selecione o tipo da rota.")
+    @Builder.Default
+    private TipoRota tipo = TipoRota.UNICA;
+
+    /** Obrigatória na Rota Fixa; ignorada na Rota Única. */
+    @Valid
+    private RotinaRequest rotina;
 
     /** A ordem da lista é a ordem do percurso. */
     @NotNull(message = "Adicione os pontos de parada.")

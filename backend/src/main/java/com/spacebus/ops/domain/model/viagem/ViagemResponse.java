@@ -32,6 +32,8 @@ public class ViagemResponse {
     private BigDecimal preco;
     private Integer capacidade;
     private StatusViagem status;
+    /** Rotina de Rota Fixa que gerou a viagem; nulo se programada à mão. */
+    private String rotinaId;
     private LocalDateTime dataCriacao;
     private LocalDateTime dataAtualizacao;
 }

@@ -4,6 +4,7 @@ import com.spacebus.ops.domain.core.exception.DomainException;
 import com.spacebus.ops.domain.core.service.BaseService;
 import com.spacebus.ops.domain.entity.Veiculo;
 import com.spacebus.ops.domain.entity.enums.StatusViagem;
+import com.spacebus.ops.domain.repository.rota.RotinaRepository;
 import com.spacebus.ops.domain.repository.veiculo.VeiculoRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
 import org.springframework.stereotype.Service;
@@ -20,11 +21,14 @@ public class VeiculoService extends BaseService<Veiculo> implements IVeiculoServ
     private static final Pattern PLACA = Pattern.compile("^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$");
 
     private final ViagemRepository viagemRepository;
+    private final RotinaRepository rotinaRepository;
     private final Clock clock;
 
-    protected VeiculoService(final VeiculoRepository repository, final ViagemRepository viagemRepository, final Clock clock) {
+    protected VeiculoService(final VeiculoRepository repository, final ViagemRepository viagemRepository,
+                             final RotinaRepository rotinaRepository, final Clock clock) {
         super(repository);
         this.viagemRepository = viagemRepository;
+        this.rotinaRepository = rotinaRepository;
         this.clock = clock;
     }
 
@@ -72,13 +76,18 @@ public class VeiculoService extends BaseService<Veiculo> implements IVeiculoServ
      */
     private void validarViagensFuturas(Veiculo veiculo) {
         var agora = LocalDateTime.now(clock);
-        if (Boolean.FALSE.equals(veiculo.getAtivo())
-                && viagemRepository.existeViagemFutura(veiculo.getId(), agora, StatusViagem.CANCELADA)) {
-            throw new DomainException("Veículo com viagens futuras não pode ser inativado. Cancele as viagens ou troque o veículo delas.");
+        if (Boolean.FALSE.equals(veiculo.getAtivo())) {
+            if (viagemRepository.existeViagemFutura(veiculo.getId(), agora, StatusViagem.CANCELADA)) {
+                throw new DomainException("Veículo com viagens futuras não pode ser inativado. Cancele as viagens ou troque o veículo delas.");
+            }
+            if (rotinaRepository.existeVigenteComVeiculo(veiculo.getId(), agora.toLocalDate())) {
+                throw new DomainException("Veículo usado na rotina de uma rota fixa não pode ser inativado. Troque o veículo da rotina.");
+            }
         }
-        var maior = viagemRepository.maiorCapacidadeFutura(veiculo.getId(), agora, StatusViagem.CANCELADA);
+        var maior = Math.max(viagemRepository.maiorCapacidadeFutura(veiculo.getId(), agora, StatusViagem.CANCELADA),
+                rotinaRepository.maiorCapacidadeVigente(veiculo.getId(), agora.toLocalDate()));
         if (veiculo.getCapacidade() != null && maior > veiculo.getCapacidade()) {
-            throw new DomainException("Há viagens futuras com %d lugares neste veículo. Ajuste as viagens antes de reduzir a capacidade.", maior);
+            throw new DomainException("Há viagens futuras ou rotinas com %d lugares neste veículo. Ajuste-as antes de reduzir a capacidade.", maior);
         }
     }
 

@@ -8,6 +8,9 @@ import { BuscaPage } from '@/pages/busca-page'
 import { HomeRedirect } from '@/pages/home-redirect'
 import { LoginPage } from '@/pages/login-page'
 import { NotFoundPage } from '@/pages/not-found-page'
+import { PagamentoSimuladoPage } from '@/pages/pagamento-simulado-page'
+import { ReservaPage } from '@/pages/reserva-page'
+import { ReservasPage } from '@/pages/reservas-page'
 import { RotaFormPage } from '@/pages/rota-form-page'
 import { RotasPage } from '@/pages/rotas-page'
 import { VeiculoFormPage } from '@/pages/veiculo-form-page'
@@ -50,6 +53,14 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: protegida('/buscar', <BuscaPage />) },
           { path: ':id', element: protegida('/buscar', <BuscaDetalhePage />) },
+        ],
+      },
+      {
+        path: 'reservas',
+        children: [
+          { index: true, element: protegida('/reservas', <ReservasPage />) },
+          { path: 'pagamento/:provedorId', element: protegida('/reservas', <PagamentoSimuladoPage />) },
+          { path: ':id', element: protegida('/reservas', <ReservaPage />) },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

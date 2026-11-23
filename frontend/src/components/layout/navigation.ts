@@ -1,4 +1,4 @@
-import { BusIcon, CalendarClockIcon, RouteIcon, SearchIcon, type LucideIcon } from 'lucide-react'
+import { BusIcon, CalendarClockIcon, RouteIcon, SearchIcon, TicketIcon, type LucideIcon } from 'lucide-react'
 import { temPerfil } from '@/features/auth/permissoes'
 import type { Perfil } from '@/features/auth/types'
 
@@ -37,7 +37,10 @@ export const navGrupos: readonly NavGrupo[] = [
   {
     // Por último: a operação continua sendo a tela inicial de Operador e Administrador.
     titulo: 'Passageiro',
-    itens: [{ title: 'Buscar viagens', to: '/buscar', icon: SearchIcon }],
+    itens: [
+      { title: 'Buscar viagens', to: '/buscar', icon: SearchIcon },
+      { title: 'Minhas reservas', to: '/reservas', icon: TicketIcon, perfis: ['PASSAGEIRO'] },
+    ],
   },
 ]
 

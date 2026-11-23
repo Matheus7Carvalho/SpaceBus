@@ -10,12 +10,12 @@ import { situacaoInfo, type AcaoViagem, type Viagem } from '../types'
 type Acao = { acao: AcaoViagem; rotulo: string; titulo: string; aviso?: string; sucesso: string; destrutiva?: boolean }
 
 const PUBLICAR: Acao = { acao: 'publicar', rotulo: 'Publicar', titulo: 'Publicar viagem?', aviso: 'A viagem fica disponível para reserva.', sucesso: 'Viagem publicada.' }
-const SUSPENDER: Acao = { acao: 'suspender', rotulo: 'Suspender', titulo: 'Suspender viagem?', aviso: 'A viagem deixa de aparecer na busca até ser publicada de novo.', sucesso: 'Viagem suspensa.' }
+const SUSPENDER: Acao = { acao: 'suspender', rotulo: 'Suspender', titulo: 'Suspender viagem?', aviso: 'A viagem deixa de aparecer na busca e não aceita reservas até ser publicada de novo. As reservas feitas continuam.', sucesso: 'Viagem suspensa.' }
 const CANCELAR: Acao = {
   acao: 'cancelar',
   rotulo: 'Cancelar viagem',
   titulo: 'Cancelar viagem?',
-  aviso: 'Não é possível desfazer.',
+  aviso: 'Não é possível desfazer. As reservas serão canceladas e os pagamentos aprovados, reembolsados.',
   sucesso: 'Viagem cancelada.',
   destrutiva: true,
 }

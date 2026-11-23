@@ -4,6 +4,7 @@ import com.spacebus.ops.domain.core.exception.DomainException;
 import com.spacebus.ops.domain.entity.Veiculo;
 import com.spacebus.ops.domain.entity.enums.StatusViagem;
 import com.spacebus.ops.domain.entity.enums.TipoVeiculo;
+import com.spacebus.ops.domain.repository.rota.RotinaRepository;
 import com.spacebus.ops.domain.repository.veiculo.VeiculoRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,12 +39,13 @@ class VeiculoServiceTest {
 
     @Mock private VeiculoRepository repository;
     @Mock private ViagemRepository viagemRepository;
+    @Mock private RotinaRepository rotinaRepository;
 
     private VeiculoService service;
 
     @BeforeEach
     void setUp() {
-        service = new VeiculoService(repository, viagemRepository, CLOCK);
+        service = new VeiculoService(repository, viagemRepository, rotinaRepository, CLOCK);
         lenient().when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -126,6 +128,25 @@ class VeiculoServiceTest {
     }
 
     @Test
+    void naoInativaNemReduzVeiculoDeRotinaVigente() {
+        var existente = veiculo("SBV1A23", 15);
+        existente.setId("v1");
+        lenient().when(repository.findById("v1")).thenReturn(Optional.of(existente));
+        var hoje = LocalDateTime.now(CLOCK).toLocalDate();
+        when(rotinaRepository.existeVigenteComVeiculo("v1", hoje)).thenReturn(true);
+        var inativo = veiculo("SBV1A23", 15);
+        inativo.setAtivo(false);
+
+        assertThatThrownBy(() -> service.update(inativo, "v1"))
+                .hasMessage("Veículo usado na rotina de uma rota fixa não pode ser inativado. Troque o veículo da rotina.");
+
+        when(rotinaRepository.maiorCapacidadeVigente("v1", hoje)).thenReturn(14);
+        assertThatThrownBy(() -> service.update(veiculo("SBV1A23", 12), "v1"))
+                .hasMessage("Há viagens futuras ou rotinas com 14 lugares neste veículo. Ajuste-as antes de reduzir a capacidade.");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void inativaVeiculoSemViagensFuturas() {
         var existente = veiculo("SBV1A23", 15);
         existente.setId("v1");
@@ -145,7 +166,7 @@ class VeiculoServiceTest {
 
         assertThatThrownBy(() -> service.update(veiculo("SBV1A23", 12), "v1"))
                 .isInstanceOf(DomainException.class)
-                .hasMessage("Há viagens futuras com 15 lugares neste veículo. Ajuste as viagens antes de reduzir a capacidade.");
+                .hasMessage("Há viagens futuras ou rotinas com 15 lugares neste veículo. Ajuste-as antes de reduzir a capacidade.");
         verify(repository, never()).save(any());
     }
 

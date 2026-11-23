@@ -10,6 +10,7 @@ import com.spacebus.ops.domain.entity.enums.TipoVeiculo;
 import com.spacebus.ops.domain.model.busca.BuscaViagemRequest;
 import com.spacebus.ops.domain.model.busca.ViagemEncontradaResponse;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
+import com.spacebus.ops.domain.service.reserva.IReservaService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,13 +48,15 @@ class BuscaViagemServiceTest {
     private static final LocalDate AMANHA = LocalDate.of(2026, 11, 18);
 
     @Mock private ViagemRepository repository;
+    @Mock private IReservaService reservas;
 
     private BuscaViagemService service;
     private Rota rota;
 
     @BeforeEach
     void setUp() {
-        service = new BuscaViagemService(repository, CLOCK, "Transportadora piloto");
+        service = new BuscaViagemService(repository, reservas, CLOCK, "Transportadora piloto");
+        lenient().when(reservas.lugaresDisponiveis(any())).thenAnswer(inv -> ((Viagem) inv.getArgument(0)).getCapacidade());
         var pontos = new ArrayList<PontoParada>();
         String[][] dados = {{"Terminal Central", "Plataforma 3"}, {"Praça Principal", null}, {"Shopping", "Portão B"}, {"Aeroporto", "Desembarque"}};
         for (int i = 0; i < dados.length; i++) {

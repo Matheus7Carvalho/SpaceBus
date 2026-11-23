@@ -7,4 +7,6 @@ export const LIMITE = {
   pontoReferencia: 150,
   pontosMin: 2,
   pontosMax: 30,
+  /** RotinaRequest.MAX_HORARIOS. */
+  horariosMax: 12,
 } as const

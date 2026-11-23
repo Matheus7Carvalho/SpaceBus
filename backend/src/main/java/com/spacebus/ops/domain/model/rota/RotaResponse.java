@@ -1,5 +1,6 @@
 package com.spacebus.ops.domain.model.rota;
 
+import com.spacebus.ops.domain.entity.enums.TipoRota;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,6 +20,9 @@ public class RotaResponse {
     private String nome;
     private String origem;
     private String destino;
+    private TipoRota tipo;
+    /** Só na Rota Fixa. */
+    private RotinaResponse rotina;
     private List<PontoParadaResponse> pontos;
     private LocalDateTime dataCriacao;
     private LocalDateTime dataAtualizacao;

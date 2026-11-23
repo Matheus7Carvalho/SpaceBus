@@ -5,7 +5,9 @@ import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useSessao } from '@/features/auth/hooks'
 import { Percurso } from '@/features/busca/components/percurso'
+import { ReservarPainel } from '@/features/reservas/components/reservar-painel'
 import { useDetalheViagem } from '@/features/busca/hooks'
 import { tipoLabel } from '@/features/veiculos/types'
 import { formatarPreco } from '@/features/viagens/types'
@@ -24,6 +26,7 @@ export function BuscaDetalhePage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const detalhe = useDetalheViagem(id)
+  const { data: usuario } = useSessao()
   const voltarPara = useVoltarPara('/buscar')
   const voltar = (
     <Button asChild variant="outline">
@@ -66,6 +69,17 @@ export function BuscaDetalhePage() {
     <>
       <PageHeader title={v.rotaNome} actions={voltar} />
       <div className="grid max-w-3xl gap-6 md:grid-cols-[1fr_1fr]">
+        {usuario?.perfil === 'PASSAGEIRO' && (
+          <div className="md:col-span-2">
+            <ReservarPainel
+              viagemId={v.id}
+              preco={v.preco}
+              lugaresDisponiveis={v.lugaresDisponiveis}
+              embarque={ordem(params.get('embarque'))}
+              desembarque={ordem(params.get('desembarque'))}
+            />
+          </div>
+        )}
         <section aria-labelledby="dados-titulo" className="grid content-start gap-3 rounded-lg border p-4">
           <h2 id="dados-titulo" className="text-base font-semibold">
             Viagem

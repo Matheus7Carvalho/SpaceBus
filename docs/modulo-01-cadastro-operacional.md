@@ -52,6 +52,21 @@ Como operador, quero controlar a situação da viagem, para que só o que está 
 - [x] Só rascunho pode ser excluído; o que já foi oferecido sai do ar por cancelamento.
 - [x] Listagem por partida, com filtros por dia, rota e situação.
 
+### H8 — Rota Única e Rota Fixa (pedido do produto, 17/11/2026)
+
+Como operador, quero marcar uma rota como fixa e definir a rotina dela, para o sistema gerar as viagens sem eu cadastrar uma a uma.
+
+- [x] Toda rota tem um tipo: **Rota Única** (viagens programadas uma a uma em Viagens, como antes) ou **Rota Fixa** (com rotina).
+- [x] A rotina tem: frequência **Diária** ou **Semanal** (com os dias da semana), de 1 a 12 horários, veículo, motorista opcional, preço, capacidade, início da vigência, fim opcional e a opção "Publicar automaticamente".
+- [x] Mesmas regras da viagem: capacidade até a do veículo, veículo ativo, motorista ativo; semanal exige ao menos um dia; horários sem repetição; fim não antes do início.
+- [x] Ao salvar, o sistema gera as viagens dos próximos **30 dias** dentro da vigência (só partidas futuras). Uma rotina diária todo dia; semanal só nos dias marcados. As viagens nascem publicadas ou em rascunho, conforme a opção.
+- [x] Uma tarefa diária estende a geração para manter sempre 30 dias à frente.
+- [x] A geração nunca duplica: o mesmo horário da mesma rotina não é criado duas vezes, nem se o operador tiver cancelado aquela viagem.
+- [x] Horário em que o veículo já tem outra viagem é pulado e contado como conflito; a tela mostra quantas viagens foram criadas e quantos conflitos houve na última geração.
+- [x] Ao alterar a rotina, os **rascunhos futuros** gerados por ela são refeitos com os novos dados. Viagens já publicadas, suspensas ou canceladas não mudam (o operador ajusta uma a uma).
+- [x] Ao mudar a rota de Fixa para Única, a rotina é removida e seus rascunhos futuros são excluídos; as viagens publicadas continuam.
+- [x] A listagem de rotas mostra o tipo e a rota fixa tem atalho para ver as viagens dela.
+
 ## Fora deste módulo (próximos)
 
 - Busca do passageiro e vagas disponíveis (dependem do módulo de reserva). Hoje a capacidade é a quantidade à venda; "vagas disponíveis" virá de capacidade − reservas confirmadas.
@@ -99,7 +114,7 @@ Defeitos apontados pelo QA:
 | D4 | O conflito "mesmo veículo, mesmo horário" era checado só na aplicação, o que falha sob concorrência. | Baixa/média | Corrigido: índice único parcial `uk_viagem_veiculo_partida_ativa`. |
 | D6 | O `nginx.conf` ainda tinha um resto do SmartMall (limite de upload). | Baixa | Corrigido. |
 | D2 | A lista de viagens busca no máximo 500 registros e filtra no cliente. | Média | **Pendente.** Paginação e filtro no servidor entram com a busca do passageiro (módulo 2). |
-| D5 | As partidas da seed são calculadas na carga e ficam no passado depois de 1 a 3 dias. | Baixa | **Pendente.** Para renovar: `docker compose down -v` e subir o backend de novo. |
+| D5 | As partidas da seed são calculadas na carga e ficam no passado depois de 1 a 3 dias. | Baixa | Corrigido em 23/11: changeset só de dev (`runAlways`) traz as viagens da seed de volta para os próximos dias a cada subida. |
 
 Lacunas de teste registradas para a próxima iteração:
 

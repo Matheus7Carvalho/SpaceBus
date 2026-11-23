@@ -16,8 +16,8 @@ public interface IViagemService extends IBaseService<Viagem> {
     /** PUBLICADA → SUSPENSA: some da busca, mas pode voltar a ser publicada. */
     Viagem suspender(String id);
 
-    /** Qualquer situação → CANCELADA. Definitivo. */
-    Viagem cancelar(String id);
+    /** Qualquer situação → CANCELADA. Definitivo. Cancela as reservas ativas em nome do responsável (histórico). */
+    Viagem cancelar(String id, String responsavelId);
 
     /**
      * Agenda do operador filtrada no servidor. Com dia: as viagens daquele dia (inclusive passadas);

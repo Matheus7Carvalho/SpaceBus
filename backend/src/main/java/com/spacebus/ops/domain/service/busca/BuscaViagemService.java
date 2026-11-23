@@ -9,6 +9,7 @@ import com.spacebus.ops.domain.model.busca.DetalheViagemResponse;
 import com.spacebus.ops.domain.model.busca.ViagemEncontradaResponse;
 import com.spacebus.ops.domain.model.rota.PontoParadaResponse;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
+import com.spacebus.ops.domain.service.reserva.IReservaService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -31,12 +32,14 @@ public class BuscaViagemService implements IBuscaViagemService {
     public static final String INDISPONIVEL = "Esta viagem não está mais disponível.";
 
     private final ViagemRepository viagemRepository;
+    private final IReservaService reservas;
     private final Clock clock;
     private final String transportadora;
 
-    public BuscaViagemService(final ViagemRepository viagemRepository, final Clock clock,
+    public BuscaViagemService(final ViagemRepository viagemRepository, final IReservaService reservas, final Clock clock,
                               @Value("${spacebus.transportadora.nome:Transportadora piloto}") final String transportadora) {
         this.viagemRepository = viagemRepository;
+        this.reservas = reservas;
         this.clock = clock;
         this.transportadora = transportadora;
     }
@@ -89,12 +92,9 @@ public class BuscaViagemService implements IBuscaViagemService {
         return List.copyOf(nomes);
     }
 
-    /**
-     * Lugares à venda: capacidade menos reservas confirmadas. Ainda não há reservas (módulo 3);
-     * este é o único ponto a completar quando houver.
-     */
-    private static int lugaresDisponiveis(Viagem viagem) {
-        return viagem.getCapacidade();
+    /** Capacidade menos reservas confirmadas e bloqueios vigentes (mesma conta da reserva). */
+    private int lugaresDisponiveis(Viagem viagem) {
+        return reservas.lugaresDisponiveis(viagem);
     }
 
     private record Trecho(PontoParada embarque, PontoParada desembarque) {

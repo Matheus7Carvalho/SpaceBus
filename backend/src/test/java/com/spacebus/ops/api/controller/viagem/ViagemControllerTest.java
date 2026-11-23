@@ -1,5 +1,8 @@
 package com.spacebus.ops.api.controller.viagem;
 
+import com.spacebus.ops.domain.entity.enums.Perfil;
+import com.spacebus.ops.domain.entity.Usuario;
+import com.spacebus.ops.api.config.security.UsuarioAutenticado;
 import com.spacebus.ops.api.config.security.PasswordConfiguration;
 import com.spacebus.ops.api.config.security.SecurityConfiguration;
 import com.spacebus.ops.api.config.web.WebConfiguration;
@@ -11,6 +14,8 @@ import com.spacebus.ops.domain.entity.enums.StatusViagem;
 import com.spacebus.ops.domain.entity.enums.TipoVeiculo;
 import com.spacebus.ops.domain.model.viagem.IViagemMapperImpl;
 import com.spacebus.ops.domain.service.viagem.IViagemService;
+import com.spacebus.ops.domain.service.reserva.IReservaService;
+import com.spacebus.ops.api.controller.reserva.ReservaRespostas;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -48,7 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ViagemController.class)
-@Import({IViagemMapperImpl.class, WebConfiguration.class, SecurityConfiguration.class, PasswordConfiguration.class})
+@Import({ReservaRespostas.class, IViagemMapperImpl.class, WebConfiguration.class, SecurityConfiguration.class, PasswordConfiguration.class})
 class ViagemControllerTest {
 
     private static final String VALIDA = """
@@ -56,6 +61,7 @@ class ViagemControllerTest {
 
     @Autowired private MockMvc mvc;
     @MockitoBean private IViagemService service;
+    @MockitoBean private IReservaService reservas;
     @MockitoBean private UserDetailsService userDetailsService;
 
     private static Viagem viagem(StatusViagem status) {
@@ -125,16 +131,37 @@ class ViagemControllerTest {
         verifyNoInteractions(service);
     }
 
+    private static UsuarioAutenticado operador() {
+        var u = new Usuario("Ana Operadora", "operador@spacebus.local", "h", Perfil.OPERADOR, true);
+        u.setId("op1");
+        return new UsuarioAutenticado(u);
+    }
+
     @Test
-    @WithMockUser(roles = "OPERADOR")
-    void transicoesDelegamAoServico() throws Exception {
+    void transicoesDelegamAoServicoECancelamentoLevaOResponsavel() throws Exception {
         when(service.publicar("vg1")).thenReturn(viagem(StatusViagem.PUBLICADA));
         when(service.suspender("vg1")).thenReturn(viagem(StatusViagem.SUSPENSA));
-        when(service.cancelar("vg1")).thenReturn(viagem(StatusViagem.CANCELADA));
+        when(service.cancelar("vg1", "op1")).thenReturn(viagem(StatusViagem.CANCELADA));
 
-        mvc.perform(post("/api/viagem/vg1/publicar")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PUBLICADA"));
-        mvc.perform(post("/api/viagem/vg1/suspender")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUSPENSA"));
-        mvc.perform(post("/api/viagem/vg1/cancelar")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELADA"));
+        mvc.perform(post("/api/viagem/vg1/publicar").with(user(operador()))).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PUBLICADA"));
+        mvc.perform(post("/api/viagem/vg1/suspender").with(user(operador()))).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUSPENSA"));
+        mvc.perform(post("/api/viagem/vg1/cancelar").with(user(operador()))).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELADA"));
+        verify(service).cancelar("vg1", "op1");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MOTORISTA", "PASSAGEIRO"})
+    void listaDePassageirosSoParaAOperacao(String perfil) throws Exception {
+        mvc.perform(get("/api/viagem/vg1/reservas").with(user("u").roles(perfil))).andExpect(status().isForbidden());
+        verifyNoInteractions(reservas);
+    }
+
+    @Test
+    void operadorVeAListaDePassageiros() throws Exception {
+        when(reservas.daViagem("vg1")).thenReturn(List.of());
+
+        mvc.perform(get("/api/viagem/vg1/reservas").with(user(operador()))).andExpect(status().isOk()).andExpect(jsonPath("$").isArray());
+        verify(reservas).daViagem("vg1");
     }
 
     @Test

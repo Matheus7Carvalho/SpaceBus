@@ -50,6 +50,9 @@ public class SecurityConfiguration {
                 // alcança os endpoints herdados de BaseController/BaseSearchController.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, LOGIN_URL).permitAll()
+                        // Retorno do provedor de pagamento: sem sessão, autenticado pelo segredo no cabeçalho.
+                        .requestMatchers(HttpMethod.POST, "/api/pagamento/webhook").permitAll()
+                        .requestMatchers("/api/reserva", "/api/reserva/**").hasRole("PASSAGEIRO")
                         .requestMatchers("/api/veiculo", "/api/veiculo/**").hasAnyRole(OPERACAO)
                         .requestMatchers("/api/rota", "/api/rota/**").hasAnyRole(OPERACAO)
                         .requestMatchers("/api/viagem", "/api/viagem/**").hasAnyRole(OPERACAO)

@@ -37,7 +37,12 @@ function useAoGravar() {
   const queryClient = useQueryClient()
   return async (salva: { id: string }) => {
     queryClient.setQueryData(viagemKeys.detalhe(salva.id), salva)
-    await Promise.all([queryClient.invalidateQueries({ queryKey: viagemKeys.agenda }), queryClient.invalidateQueries({ queryKey: ['busca'] })])
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: viagemKeys.agenda }),
+      queryClient.invalidateQueries({ queryKey: ['busca'] }),
+      // Cancelar a viagem cancela as reservas: a lista de passageiros muda junto.
+      queryClient.invalidateQueries({ queryKey: ['viagens', salva.id, 'reservas'] }),
+    ])
   }
 }
 

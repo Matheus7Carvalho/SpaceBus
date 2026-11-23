@@ -53,4 +53,13 @@ public class Viagem extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "STATUS", nullable = false, length = 10)
     private StatusViagem status;
+
+    /** Rotina (Rota Fixa) que gerou a viagem; nulo se programada à mão. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ROTINA_ID")
+    private Rotina rotina;
+
+    public Viagem(Rota rota, Veiculo veiculo, Usuario motorista, LocalDateTime partida, BigDecimal preco, Integer capacidade, StatusViagem status) {
+        this(rota, veiculo, motorista, partida, preco, capacidade, status, null);
+    }
 }

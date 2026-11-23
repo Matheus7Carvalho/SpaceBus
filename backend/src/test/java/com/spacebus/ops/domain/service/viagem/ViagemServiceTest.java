@@ -12,6 +12,7 @@ import com.spacebus.ops.domain.repository.rota.RotaRepository;
 import com.spacebus.ops.domain.repository.usuario.UsuarioRepository;
 import com.spacebus.ops.domain.repository.veiculo.VeiculoRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
+import com.spacebus.ops.domain.service.reserva.IReservaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +58,7 @@ class ViagemServiceTest {
     @Mock private RotaRepository rotaRepository;
     @Mock private VeiculoRepository veiculoRepository;
     @Mock private UsuarioRepository usuarioRepository;
+    @Mock private IReservaService reservas;
 
     private ViagemService service;
     private final Rota rota = new Rota("Centro – Aeroporto", "Centro", "Aeroporto", List.of());
@@ -65,7 +67,7 @@ class ViagemServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ViagemService(repository, rotaRepository, veiculoRepository, usuarioRepository, CLOCK);
+        service = new ViagemService(repository, rotaRepository, veiculoRepository, usuarioRepository, reservas, CLOCK);
         rota.setId("r1");
         van.setId("v1");
         motorista.setId("m1");
@@ -92,7 +94,8 @@ class ViagemServiceTest {
     private Viagem existente(StatusViagem status) {
         var viagem = new Viagem(rota, van, null, AMANHA_7H, new BigDecimal("18.50"), 15, status);
         viagem.setId("vg1");
-        when(repository.findById("vg1")).thenReturn(Optional.of(viagem));
+        lenient().when(repository.findById("vg1")).thenReturn(Optional.of(viagem));
+        lenient().when(repository.travar("vg1")).thenReturn(Optional.of(viagem));
         return viagem;
     }
 
@@ -254,6 +257,47 @@ class ViagemServiceTest {
     }
 
     @Test
+    void naoReduzCapacidadeAbaixoDosLugaresReservados() {
+        existente(PUBLICADA);
+        when(reservas.lugaresOcupados("vg1")).thenReturn(11);
+
+        assertThatThrownBy(() -> service.update(pedido(null, AMANHA_7H, 10), "vg1"))
+                .hasMessage("Já há 11 lugares reservados nesta viagem. A capacidade não pode ser menor.");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void viagemComReservasNaoTrocaDeRota() {
+        existente(PUBLICADA);
+        when(reservas.lugaresOcupados("vg1")).thenReturn(1);
+        var outra = new Rota("Outra", "X", "Y", List.of());
+        outra.setId("r2");
+        when(rotaRepository.findById("r2")).thenReturn(Optional.of(outra));
+        var pedido = pedido(null, AMANHA_7H, 15);
+        pedido.getRota().setId("r2");
+
+        assertThatThrownBy(() -> service.update(pedido, "vg1")).hasMessage("Viagem com reservas não pode trocar de rota.");
+    }
+
+    @Test
+    void cancelarViagemCancelaAsReservas() {
+        existente(PUBLICADA);
+
+        service.cancelar("vg1", "op1");
+
+        verify(reservas).cancelarPorViagem("vg1", "op1");
+    }
+
+    @Test
+    void transicoesTravamAViagem() {
+        existente(RASCUNHO);
+
+        service.publicar("vg1");
+
+        verify(repository).travar("vg1");
+    }
+
+    @Test
     void suspendeSoPublicada() {
         existente(PUBLICADA);
         assertThat(service.suspender("vg1").getStatus()).isEqualTo(SUSPENSA);
@@ -272,14 +316,14 @@ class ViagemServiceTest {
     void cancelaQualquerSituacaoAtiva(StatusViagem inicial) {
         existente(inicial);
 
-        assertThat(service.cancelar("vg1").getStatus()).isEqualTo(CANCELADA);
+        assertThat(service.cancelar("vg1", "op1").getStatus()).isEqualTo(CANCELADA);
     }
 
     @Test
     void naoCancelaDuasVezes() {
         existente(CANCELADA);
 
-        assertThatThrownBy(() -> service.cancelar("vg1")).hasMessage("A viagem já está cancelada.");
+        assertThatThrownBy(() -> service.cancelar("vg1", "op1")).hasMessage("A viagem já está cancelada.");
     }
 
     @Test

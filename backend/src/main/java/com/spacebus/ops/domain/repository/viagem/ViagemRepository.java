@@ -3,6 +3,9 @@ package com.spacebus.ops.domain.repository.viagem;
 import com.spacebus.ops.domain.core.repository.BaseRepository;
 import com.spacebus.ops.domain.entity.Viagem;
 import com.spacebus.ops.domain.entity.enums.StatusViagem;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -11,11 +14,29 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ViagemRepository extends BaseRepository<Viagem> {
 
     boolean existsByVeiculoId(String veiculoId);
+
+    /**
+     * Trava a linha da viagem até o fim da transação (SELECT ... FOR UPDATE). Toda reserva e confirmação
+     * da mesma viagem passa por aqui, então a conta de lugares nunca é feita por duas transações ao mesmo tempo.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from Viagem v where v.id = :id")
+    Optional<Viagem> travar(String id);
+
+    /** O horário já foi gerado por esta rotina (em qualquer situação, inclusive cancelada). */
+    boolean existsByRotinaIdAndPartida(String rotinaId, LocalDateTime partida);
+
+    /** Remove os rascunhos futuros gerados pela rotina (nunca foram oferecidos ao passageiro). */
+    // Sem clearAutomatically: limpar o contexto desanexaria a rota que está sendo salva na mesma transação.
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Viagem v where v.rotina.id = :rotinaId and v.status = :rascunho and v.partida > :agora")
+    int excluirRascunhosFuturos(String rotinaId, LocalDateTime agora, StatusViagem rascunho);
 
     boolean existsByRotaId(String rotaId);
 

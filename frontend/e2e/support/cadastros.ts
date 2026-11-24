@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type APIRequestContext, type Page } from '@playwright/test'
 
 /**
  * Helpers genéricos das telas de cadastro (CadastroForm): salvar e permanecer, voltar à lista,
@@ -11,11 +11,27 @@ export const SEED = {
   vanSprinter: '9a1b0000-0001-4c00-8000-000000000001',
   vanMaster: '9a1b0000-0001-4c00-8000-000000000002',
   viagemPublicada: '7d3e0000-0001-4e00-a000-000000000001',
+  viagemPublicada12h30: '7d3e0000-0001-4e00-a000-000000000002',
   viagemCancelada: '7d3e0000-0001-4e00-a000-000000000004',
 } as const
 
-/** Prefixo dos registros criados pelos testes (limpeza no afterEach). */
+/** Prefixo dos registros criados pelos testes (limpeza no afterEach e no global-teardown). */
 export const PREFIXO_E2E = 'E2E'
+
+/**
+ * Van só dos testes (criada no global-setup). Viagens criadas pela API usam esta van: com a descrição marcada,
+ * a limpeza do teardown sabe que são de teste, inclusive as canceladas, que a regra não deixa excluir.
+ */
+export const VAN_E2E = { placa: 'TST9E99', descricao: `${PREFIXO_E2E} Van de testes`, tipo: 'VAN', capacidade: 15, ativo: true } as const
+
+export async function idDaVanE2E(request: APIRequestContext) {
+  const resposta = await request.get('/api/veiculo?size=500')
+  expect(resposta.ok()).toBe(true)
+  const { content } = (await resposta.json()) as { content: { id: string; placa: string }[] }
+  const van = content.find((v) => v.placa === VAN_E2E.placa)
+  if (!van) throw new Error(`Van ${VAN_E2E.placa} não encontrada: o global-setup deveria tê-la criado.`)
+  return van.id
+}
 
 export function sufixoUnico(tamanho = 6) {
   return (Date.now().toString(36) + Math.random().toString(36).slice(2)).slice(-tamanho).toUpperCase()

@@ -1,5 +1,8 @@
 package com.spacebus.ops.api.controller.viagem;
 
+import com.spacebus.ops.domain.entity.enums.Perfil;
+import com.spacebus.ops.domain.entity.Usuario;
+import com.spacebus.ops.api.config.security.UsuarioAutenticado;
 import com.spacebus.ops.api.config.security.PasswordConfiguration;
 import com.spacebus.ops.api.config.security.SecurityConfiguration;
 import com.spacebus.ops.api.config.web.WebConfiguration;
@@ -11,6 +14,9 @@ import com.spacebus.ops.domain.entity.enums.StatusViagem;
 import com.spacebus.ops.domain.entity.enums.TipoVeiculo;
 import com.spacebus.ops.domain.model.viagem.IViagemMapperImpl;
 import com.spacebus.ops.domain.service.viagem.IViagemService;
+import com.spacebus.ops.domain.service.auditoria.IAuditoriaService;
+import com.spacebus.ops.domain.service.reserva.IReservaService;
+import com.spacebus.ops.api.controller.reserva.ReservaRespostas;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -24,12 +30,20 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -40,7 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ViagemController.class)
-@Import({IViagemMapperImpl.class, WebConfiguration.class, SecurityConfiguration.class, PasswordConfiguration.class})
+@Import({ReservaRespostas.class, IViagemMapperImpl.class, WebConfiguration.class, SecurityConfiguration.class, PasswordConfiguration.class})
 class ViagemControllerTest {
 
     private static final String VALIDA = """
@@ -48,6 +62,8 @@ class ViagemControllerTest {
 
     @Autowired private MockMvc mvc;
     @MockitoBean private IViagemService service;
+    @MockitoBean private IReservaService reservas;
+    @MockitoBean private IAuditoriaService auditoria;
     @MockitoBean private UserDetailsService userDetailsService;
 
     private static Viagem viagem(StatusViagem status) {
@@ -117,16 +133,108 @@ class ViagemControllerTest {
         verifyNoInteractions(service);
     }
 
+    private static UsuarioAutenticado operador() {
+        var u = new Usuario("Ana Operadora", "operador@spacebus.local", "h", Perfil.OPERADOR, true);
+        u.setId("op1");
+        return new UsuarioAutenticado(u);
+    }
+
     @Test
-    @WithMockUser(roles = "OPERADOR")
-    void transicoesDelegamAoServico() throws Exception {
+    void transicoesDelegamAoServicoECancelamentoLevaOResponsavel() throws Exception {
         when(service.publicar("vg1")).thenReturn(viagem(StatusViagem.PUBLICADA));
         when(service.suspender("vg1")).thenReturn(viagem(StatusViagem.SUSPENSA));
-        when(service.cancelar("vg1")).thenReturn(viagem(StatusViagem.CANCELADA));
+        when(service.cancelar("vg1", "op1")).thenReturn(viagem(StatusViagem.CANCELADA));
 
-        mvc.perform(post("/api/viagem/vg1/publicar")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PUBLICADA"));
-        mvc.perform(post("/api/viagem/vg1/suspender")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUSPENSA"));
-        mvc.perform(post("/api/viagem/vg1/cancelar")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELADA"));
+        mvc.perform(post("/api/viagem/vg1/publicar").with(user(operador()))).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("PUBLICADA"));
+        mvc.perform(post("/api/viagem/vg1/suspender").with(user(operador()))).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("SUSPENSA"));
+        mvc.perform(post("/api/viagem/vg1/cancelar").with(user(operador()))).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELADA"));
+        verify(service).cancelar("vg1", "op1");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MOTORISTA", "PASSAGEIRO"})
+    void listaDePassageirosSoParaAOperacao(String perfil) throws Exception {
+        mvc.perform(get("/api/viagem/vg1/reservas").with(user("u").roles(perfil))).andExpect(status().isForbidden());
+        verifyNoInteractions(reservas, auditoria);
+    }
+
+    @Test
+    void operadorVeAListaDePassageiros() throws Exception {
+        when(reservas.daViagem("vg1")).thenReturn(List.of());
+
+        mvc.perform(get("/api/viagem/vg1/reservas").with(user(operador()))).andExpect(status().isOk()).andExpect(jsonPath("$").isArray());
+        verify(reservas).daViagem("vg1");
+    }
+
+    /** QA R2: id inexistente ou longo demais responde 404 sem gravar auditoria nem expor erro de banco. */
+    @Test
+    void listaDePassageirosDeViagemInexistenteResponde404SemAuditoria() throws Exception {
+        var idLongo = "x".repeat(40);
+        when(service.findById(idLongo)).thenThrow(new jakarta.persistence.EntityNotFoundException("Item não encontrado."));
+
+        mvc.perform(get("/api/viagem/" + idLongo + "/reservas").with(user(operador()))).andExpect(status().isNotFound());
+
+        verifyNoInteractions(auditoria, reservas);
+    }
+
+    /** QA N7: o acesso à lista de passageiros é gravado (quem, perfil, viagem) antes de a lista sair. */
+    @Test
+    void acessoAListaDePassageirosEGravadoAntesDaLista() throws Exception {
+        when(reservas.daViagem("vg1")).thenReturn(List.of());
+
+        mvc.perform(get("/api/viagem/vg1/reservas").with(user(operador()))).andExpect(status().isOk());
+
+        var ordem = org.mockito.Mockito.inOrder(auditoria, reservas);
+        ordem.verify(auditoria).registrar("op1", com.spacebus.ops.domain.entity.enums.Perfil.OPERADOR,
+                com.spacebus.ops.domain.entity.enums.AcaoAuditada.CONSULTA_PASSAGEIROS_VIAGEM, "vg1");
+        ordem.verify(reservas).daViagem("vg1");
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERADOR")
+    void agendaRepassaFiltrosEPaginaPorPartida() throws Exception {
+        when(service.agenda(any(), any(), any(), any())).thenAnswer(inv -> new PageImpl<>(List.of(viagem(StatusViagem.PUBLICADA)), inv.getArgument(3), 1));
+
+        mvc.perform(get("/api/viagem/agenda?dia=2026-11-18&rotaId=r1&status=PUBLICADA"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].status").value("PUBLICADA"))
+                .andExpect(jsonPath("$.page.totalElements").value(1))
+                .andExpect(jsonPath("$.page.size").value(100));
+
+        var pagina = ArgumentCaptor.forClass(Pageable.class);
+        verify(service).agenda(eq(LocalDate.of(2026, 11, 18)), eq("r1"), eq(StatusViagem.PUBLICADA), pagina.capture());
+        assertThat(pagina.getValue().getSort().getOrderFor("partida")).isNotNull();
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERADOR")
+    void agendaIgnoraOrdenacaoETamanhoDoClienteEAceitaPagina() throws Exception {
+        when(service.agenda(any(), any(), any(), any())).thenReturn(Page.empty());
+
+        mvc.perform(get("/api/viagem/agenda?page=2&size=5000&sort=motorista.senha")).andExpect(status().isOk());
+
+        var pagina = ArgumentCaptor.forClass(Pageable.class);
+        verify(service).agenda(isNull(), isNull(), isNull(), pagina.capture());
+        assertThat(pagina.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(pagina.getValue().getPageSize()).isEqualTo(100);
+        assertThat(pagina.getValue().getSort()).containsExactly(Sort.Order.asc("partida"), Sort.Order.asc("id"));
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERADOR")
+    void agendaSemFiltros() throws Exception {
+        when(service.agenda(any(), any(), any(), any())).thenReturn(Page.empty());
+
+        mvc.perform(get("/api/viagem/agenda")).andExpect(status().isOk());
+
+        verify(service).agenda(isNull(), isNull(), isNull(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "PASSAGEIRO")
+    void passageiroNaoVeAgenda() throws Exception {
+        mvc.perform(get("/api/viagem/agenda")).andExpect(status().isForbidden());
+        verifyNoInteractions(service);
     }
 
     @Test

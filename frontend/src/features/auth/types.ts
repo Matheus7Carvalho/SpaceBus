@@ -7,12 +7,14 @@ export const perfilLabel: Record<Perfil, string> = {
   PASSAGEIRO: 'Passageiro',
 }
 
-/** Espelha UsuarioResponse. */
+/** Espelha SessaoResponse. */
 export type UsuarioSessao = {
   id: string
   nome: string
   email: string
   perfil: Perfil
+  /** Fuso da operação (IANA, ex.: "America/Araguaina"): "hoje" e "agora" da tela seguem o servidor. */
+  fusoHorario: string
 }
 
 export type LoginRequest = {

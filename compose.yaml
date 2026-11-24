@@ -25,6 +25,7 @@ services:
     build: ./backend
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      SPACEBUS_TRANSPORTADORA: ${SPACEBUS_TRANSPORTADORA:-Transportadora piloto}
       POSTGRES_DB: ${POSTGRES_DB:-spacebus}
       POSTGRES_USER: ${POSTGRES_USER:-spacebus}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-spacebus}

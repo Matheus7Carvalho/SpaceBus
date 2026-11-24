@@ -13,4 +13,11 @@
     <include file="db/changes/viagem/20261117-1-cria-viagem.sql"/>
     <include file="db/changes/viagem/20261117-2-seed-viagem.sql" context="dev"/>
     <include file="db/changes/viagem/20261117-3-unico-veiculo-horario.sql"/>
+    <include file="db/changes/rota/20261117-3-tipo-e-rotina.sql"/>
+    <include file="db/changes/reserva/20261117-1-cria-reserva-pagamento.sql"/>
+    <include file="db/changes/reserva/20261123-1-historico-e-reembolso-pendente.sql"/>
+    <include file="db/changes/reserva/20261123-2-ordem-historico.sql"/>
+    <include file="db/changes/viagem/20261123-1-renova-seed-viagem.sql" context="dev"/>
+    <include file="db/changes/reserva/20261124-1-tentativas-reembolso.sql"/>
+    <include file="db/changes/auditoria/20261124-1-cria-auditoria-acesso.sql"/>
 </databaseChangeLog>

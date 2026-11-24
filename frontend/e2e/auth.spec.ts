@@ -93,7 +93,7 @@ test.describe('Permissões por perfil', () => {
       await expect(page.getByRole('heading', { level: 1, name: 'Viagens' })).toBeVisible()
       const menu = await navegacao(page, isMobile)
       for (const item of ['Viagens', 'Rotas', 'Veículos']) {
-        await expect(menu.getByRole('link', { name: item })).toBeVisible()
+        await expect(menu.getByRole('link', { name: item, exact: true })).toBeVisible()
       }
 
       await page.keyboard.press('Escape')
@@ -102,11 +102,17 @@ test.describe('Permissões por perfil', () => {
   })
 
   for (const conta of [contas.motorista, contas.passageiro]) {
-    test(`${conta.perfil} não vê a operação no menu e é bloqueado pela URL`, async ({ page }) => {
+    test(`${conta.perfil} entra na busca, não vê a operação no menu e é bloqueado pela URL`, async ({ page, isMobile }) => {
       await entrar(page, conta)
 
-      await expect(page.getByText('Nenhum módulo disponível para o seu perfil.')).toBeVisible()
-      await expect(page.getByRole('link', { name: 'Viagens' })).toHaveCount(0)
+      await expect(page).toHaveURL(/\/buscar$/)
+      await expect(page.getByRole('heading', { level: 1, name: 'Buscar viagens' })).toBeVisible()
+      const menu = await navegacao(page, isMobile)
+      await expect(menu.getByRole('link', { name: 'Buscar viagens' })).toBeVisible()
+      for (const restrito of ['Viagens', 'Rotas', 'Veículos']) {
+        await expect(menu.getByRole('link', { name: restrito, exact: true })).toHaveCount(0)
+      }
+      await page.keyboard.press('Escape')
 
       for (const rota of ['/operacao/viagens', '/cadastros/rotas/nova', '/cadastros/veiculos']) {
         await page.goto(rota)
@@ -132,9 +138,8 @@ test.describe('Sessão', () => {
 
     await preencherLogin(page, contas.passageiro.email, SENHA_DEMO)
 
-    // Sem módulo permitido, vai para o início, não para a rota de origem.
-    await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByText('Nenhum módulo disponível para o seu perfil.')).toBeVisible()
+    // Vai para o primeiro módulo permitido (busca), não para a rota de origem.
+    await expect(page).toHaveURL(/\/buscar$/)
   })
 
   test('sessão continua após recarregar a página', async ({ page }) => {

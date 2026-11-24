@@ -20,17 +20,18 @@ Rota ────┘        │                                               �
 | Termo | O que é | No código | Situação |
 |---|---|---|---|
 | **Veículo** | Van (ou ônibus) da transportadora: placa, descrição, tipo, capacidade, ativo | `Veiculo`, `/api/veiculo`, tela `/cadastros/veiculos` | Implementado |
-| **Rota** | Percurso com nome, origem, destino e pontos de parada ordenados | `Rota`, `/api/rota`, tela `/cadastros/rotas` | Implementado |
+| **Rota** | Percurso com nome, origem, destino e pontos de parada ordenados. **Rota Única** (viagens uma a uma) ou **Rota Fixa** (com rotina) | `Rota`, `TipoRota`, `/api/rota`, tela `/cadastros/rotas` | Implementado |
+| **Rotina** | Programação da Rota Fixa (diária ou semanal, horários, veículo, preço, capacidade, vigência) que gera as viagens dos próximos 30 dias; nunca gera duas vezes o mesmo horário | `Rotina`, `GeradorViagens`, `AgendadorRotinas` | Implementado |
 | **Ponto de parada** | Local de embarque/desembarque da rota, na ordem do percurso, com referência opcional | `PontoParada` (sempre dentro da rota) | Implementado |
-| **Viagem** | Uma partida da rota num horário, com veículo, motorista (opcional), preço e capacidade (lugares à venda) | `Viagem`, `/api/viagem`, tela `/operacao/viagens` | Implementado (cadastro do operador) |
+| **Viagem** | Uma partida da rota num horário, com veículo, motorista (opcional), preço e capacidade (lugares à venda) | `Viagem`, `/api/viagem`, tela `/operacao/viagens` | Implementado (cadastro do operador; busca e detalhe do passageiro em `/api/busca`, tela `/buscar`) |
 | **Situação da viagem** | `RASCUNHO → PUBLICADA ⇄ SUSPENSA`; qualquer uma → `CANCELADA` (definitivo). Só `PUBLICADA` aparece ao passageiro | `StatusViagem`, `POST /api/viagem/{id}/publicar`, `/suspender`, `/cancelar` | Implementado |
-| **Reserva** | Lugar(es) de um passageiro numa viagem, identificada por código; bloqueio temporário durante o pagamento | — | A implementar (módulo 3) |
-| **Vagas disponíveis** | Capacidade − reservas confirmadas e bloqueios vigentes. Nunca negativa; nunca dupla venda | — | A implementar (módulo 3) |
-| **Pagamento** | Cobrança no provedor externo; reserva confirmada só após retorno confirmado | — | A implementar (módulo 3) |
+| **Reserva** | Lugar(es) de um passageiro numa viagem, identificada por código; bloqueio temporário durante o pagamento. `AGUARDANDO_PAGAMENTO → CONFIRMADA`; `EXPIRADA`, `CANCELADA` | `Reserva`, `/api/reserva`, telas `/reservas` | Implementado |
+| **Vagas disponíveis** | Capacidade − reservas confirmadas e bloqueios vigentes. Nunca negativa; nunca dupla venda (conta feita com a viagem travada: `ViagemRepository.travar`) | `IReservaService.lugaresDisponiveis` | Implementado |
+| **Pagamento** | Cobrança no provedor externo (`ProvedorPagamento`; no piloto, `ProvedorPagamentoSimulado`); reserva confirmada só após o retorno do provedor (webhook idempotente) | `Pagamento`, `POST /api/pagamento/webhook` | Implementado (simulado) |
 | **Localização** | Última posição da viagem ativa enviada pelo celular do motorista, com hora da atualização | — | A implementar (módulo 4) |
 | **Notificação** | Mensagem transacional (confirmação, alteração, cancelamento, lembrete); falha de entrega não muda a reserva | — | A implementar (módulo 5) |
 
-Perfis (`Perfil`): `ADMINISTRADOR` (equipe Space Bus), `OPERADOR` (transportadora), `MOTORISTA`, `PASSAGEIRO`. Menu: **Operação** (Viagens), **Cadastros** (Rotas, Veículos). "Lugares" é o termo de tela para capacidade.
+Perfis (`Perfil`): `ADMINISTRADOR` (equipe Space Bus), `OPERADOR` (transportadora), `MOTORISTA`, `PASSAGEIRO`. Menu: **Operação** (Viagens), **Cadastros** (Rotas, Veículos), **Passageiro** (Buscar viagens, para todos os perfis; Minhas reservas, só Passageiro). **Trecho** é o par embarque → desembarque do passageiro dentro do percurso da rota. "Lugares" é o termo de tela para capacidade.
 
 ## Decisões de arquitetura
 
@@ -122,7 +123,9 @@ Regras:
 - Transições de status (publicar, suspender, cancelar, iniciar, encerrar) são endpoints explícitos (`POST /api/viagem/{id}/publicar`), não `PUT` genérico. O `*Request` de edição não carrega o status.
 - Erro de regra de negócio: lançar `DomainException` com mensagem curta em pt-BR. O `RestExceptionHandler` converte para `ResponseError`.
 - Mudanças de status de reserva e pagamento gravam histórico (entidade, ação, responsável, data, resultado) a partir do módulo 3; o acesso administrativo deve ser registrado (escopo, seção 3).
+- **Ordem de travas na reserva:** sempre **viagem → reserva → pagamento** (`ViagemRepository.travar`, `ReservaRepository.travar`, `PagamentoRepository.travarPorProvedorId`). Descubra os ids por consulta escalar e só leia as entidades **depois** de travar; ler antes deixa dados velhos na sessão do Hibernate (defeito D1 do módulo 3 e, de novo, no cancelamento da viagem em 24/11). Tarefas em lote usam `SKIP LOCKED`. Concorrência se prova com `ReservaConcorrenciaIntegracaoTest` (Testcontainers, PostgreSQL real).
 - **Módulos críticos** (reserva, pagamento, localização): concorrência e idempotência com teste. Nunca duas vendas da mesma vaga (trava/constraint no banco, não só checagem em memória); webhook de pagamento repetido não duplica efeito; serviço externo com timeout, retry limitado e fallback, sem mudar o estado real por falha de entrega.
+- **Provedor de pagamento:** só via `ClienteProvedorPagamento` (tempo limite) e **nunca com trava segura**. Cobrança: duas transações curtas com a chamada entre elas e chave de idempotência. Reembolso: marcar `REEMBOLSO_PENDENTE` e publicar `ReembolsoSolicitado`; o `ProcessadorReembolsos` chama o provedor depois do commit, com tentativas limitadas.
 - Autorização por perfil verificada no servidor, não só no frontend.
 - Controllers não contêm regra de negócio; apenas delegam ao serviço.
 - Testes de serviço para todas as regras. Controllers com `@WebMvcTest`, importando `SecurityConfiguration` e `PasswordConfiguration`.
@@ -315,7 +318,7 @@ Testes instáveis (flaky) são defeito, não azar. Regras:
   - `expect.poll` para estilos com transição.
 - **Mensagens repetíveis (toasts):** não usá-las como prova de que *esta* ação terminou.
 - **Dados da seed são somente leitura nos testes.** Testes que mexem num registro da seed não salvam; os que precisam salvar criam o próprio registro e o apagam no `afterEach`.
-- **Registro que a regra de negócio não deixa excluir** (ex.: viagem cancelada): use nome/descrição com prefixo `E2E` e partida aleatória. Um endpoint de limpeza por marca (só no perfil dev, só Administrador) entra quando o volume de dados de teste atrapalhar.
+- **Registro que a regra de negócio não deixa excluir** (ex.: viagem cancelada): use nome/descrição com prefixo `E2E` e partida aleatória. O `global-teardown` do Playwright apaga esses dados ao fim da suíte por `DELETE /api/dev/dados-teste?marca=E2E` (só perfil dev, só Administrador).
 - **Ambiente estável:**
   - não rodar o E2E enquanto containers reiniciam;
   - não compilar o backend (`mvnw test`/`compile`) com o backend dev no ar durante o E2E: o devtools recarrega no meio da compilação e o login quebra;
@@ -328,8 +331,8 @@ Testes instáveis (flaky) são defeito, não azar. Regras:
 Ordem dos módulos (detalhe em `docs/escopo-mvp.md`). Um módulo só começa depois do anterior aprovado pelo QA.
 
 1. **Cadastro operacional** (veículo, rota, viagem) — entregue para teste.
-2. **Consulta de viagens** pelo passageiro (origem, destino, data; detalhe da rota; mensagem sem resultado). Endpoint próprio de leitura, só viagens `PUBLICADA` com partida futura.
-3. **Reserva e pagamento** (código, bloqueio temporário, provedor externo, sem dupla venda).
+2. **Consulta de viagens** pelo passageiro — entregue para teste. Endpoint próprio de leitura (`/api/busca`), só viagens `PUBLICADA` com partida futura; "lugares disponíveis" calculado num único ponto (`BuscaViagemService.lugaresDisponiveis`) que o módulo 3 completa com as reservas.
+3. **Reserva e pagamento** — entregue para teste. Premissas do piloto (quantidade de lugares, 10 min de bloqueio, pagamento simulado, cancelamento até 2 h antes) em `docs/modulo-03-reserva-pagamento.md`.
 4. **Localização** da viagem ativa (celular do motorista, hora da última atualização, dado desatualizado sinalizado).
 5. **Notificações** (aplicação + WhatsApp/e-mail com consentimento).
 6. **Indicadores básicos** (viagens, lugares vendidos, ocupação por horário).

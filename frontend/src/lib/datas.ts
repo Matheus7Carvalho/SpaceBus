@@ -16,8 +16,27 @@ export function deIsoData(iso: string) {
   return new Date(a, m - 1, d)
 }
 
-export function hojeIso() {
-  return paraIsoData(new Date())
+/**
+ * O mesmo instante como relógio de parede do fuso da operação: os campos locais do Date (dia, hora) passam a ser
+ * os do fuso. Assim "hoje" não muda de dia para quem está em outro fuso perto da meia-noite. Sem fuso, não converte.
+ */
+export function noFuso(instante: Date, fuso?: string) {
+  if (!fuso) return instante
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: fuso,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(instante)
+      .map((p) => [p.type, Number(p.value)]),
+  )
+  return new Date(partes.year, partes.month - 1, partes.day, partes.hour, partes.minute, partes.second)
 }
 
 export function somarDias(data: Date, dias: number) {

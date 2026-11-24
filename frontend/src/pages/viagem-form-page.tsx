@@ -1,6 +1,7 @@
 import { useParams } from 'react-router'
 import { PageHeader } from '@/components/shared/page-header'
 import { RegistroLoader } from '@/components/shared/registro-loader'
+import { ReservasDaViagem } from '@/features/reservas/components/reservas-da-viagem'
 import { ViagemForm } from '@/features/viagens/components/viagem-form'
 import { useSalvarViagem, useViagem } from '@/features/viagens/hooks'
 import { paraFormulario, paraRequisicao } from '@/features/viagens/schemas'
@@ -24,6 +25,7 @@ export function ViagemFormPage() {
       <RegistroLoader edicao={!!id} consulta={viagem} naoEncontrado="Viagem não encontrada.">
         <ViagemForm key={viagem.data?.id ?? 'nova'} viagem={viagem.data} defaultValues={paraFormulario(viagem.data)} {...acoes} />
       </RegistroLoader>
+      {viagem.data && <ReservasDaViagem key={viagem.data.status} viagemId={viagem.data.id} capacidade={viagem.data.capacidade} />}
     </>
   )
 }

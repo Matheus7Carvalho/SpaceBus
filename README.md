@@ -14,7 +14,10 @@ MVP para passageiros encontrarem, acompanharem, reservarem e pagarem viagens de 
 | # | Módulo | Situação |
 |---|---|---|
 | 1 | [Cadastro operacional](docs/modulo-01-cadastro-operacional.md): veículos, rotas com pontos de parada, viagens (publicar, suspender, cancelar) | Em teste |
-| 2–6 | Busca do passageiro, reserva e pagamento, localização, notificações, indicadores | A fazer ([docs/escopo-mvp.md](docs/escopo-mvp.md)) |
+| 2 | [Consulta de viagens](docs/modulo-02-consulta-viagens.md): busca por origem, destino e data; detalhe com o percurso | Em teste |
+| 1+ | Rota Única e Rota Fixa: a rota fixa tem rotina diária ou semanal que gera as viagens dos próximos 30 dias | Em teste |
+| 3 | [Reserva e pagamento](docs/modulo-03-reserva-pagamento.md): reserva com código, bloqueio de 10 min, pagamento simulado, minhas reservas, cancelamento com reembolso, passageiros por viagem | Em teste |
+| 4–6 | Localização, notificações, indicadores | A fazer ([docs/escopo-mvp.md](docs/escopo-mvp.md)) |
 
 ## Requisitos
 
@@ -61,18 +64,22 @@ Criadas pela seed do Liquibase (contexto `dev`). A tela de login tem atalhos par
 
 | Perfil | E-mail | Senha | Acessa hoje |
 |---|---|---|---|
-| Administrador | `admin@spacebus.local` | `demo123` | Viagens, Rotas, Veículos |
-| Operador | `operador@spacebus.local` | `demo123` | Viagens, Rotas, Veículos |
-| Motorista | `motorista@spacebus.local` | `demo123` | Nenhum módulo ainda |
-| Passageiro | `passageiro@spacebus.local` | `demo123` | Nenhum módulo ainda |
+| Administrador | `admin@spacebus.local` | `demo123` | Viagens, Rotas, Veículos, Buscar viagens |
+| Operador | `operador@spacebus.local` | `demo123` | Viagens, Rotas, Veículos, Buscar viagens |
+| Motorista | `motorista@spacebus.local` | `demo123` | Buscar viagens |
+| Passageiro | `passageiro@spacebus.local` | `demo123` | Buscar viagens, Minhas reservas |
 
-Há também um segundo motorista, `caio.nunes@spacebus.local`. A seed traz a rota "Centro – Aeroporto" (4 pontos), três veículos (um inativo) e quatro viagens (publicadas, rascunho e cancelada), com partidas a partir do dia seguinte à carga. As datas são fixadas na primeira carga; para renovar a seed: `docker compose down -v` e suba o backend de novo.
+Há também um segundo motorista, `caio.nunes@spacebus.local`. A seed traz a rota "Centro – Aeroporto" (4 pontos), três veículos (um inativo) e quatro viagens (publicadas, rascunho e cancelada), com partidas a partir do dia seguinte. Em dev, a cada subida do backend as viagens da seed que ficaram no passado voltam para os próximos dias.
+
+O pagamento é **simulado** (Pix de teste): na tela do provedor, o passageiro escolhe "Aprovar pagamento" ou "Recusar pagamento". Nenhuma cobrança real é feita.
 
 ## Testes
 
 ```bash
 cd backend && ./mvnw test
 ```
+
+Os testes de concorrência de reserva (`ReservaConcorrenciaIntegracaoTest`) sobem um PostgreSQL real com Testcontainers; precisam do Docker no ar e são pulados sem ele.
 
 ```bash
 cd frontend && npx tsc -b && npm run lint && npm run build

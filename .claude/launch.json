@@ -3,16 +3,16 @@
   "configurations": [
     {
       "name": "backend",
-      "runtimeExecutable": "backend/mvnw.cmd",
+      "runtimeExecutable": "cmd",
       "runtimeArgs": [
-        "-f",
-        "backend/pom.xml",
-        "spring-boot:run"
+        "/c",
+        "cd backend && .\\mvnw.cmd spring-boot:run"
       ],
       "port": 8080,
       "env": {
         "POSTGRES_PORT": "5433"
-      }
+      },
+      "autoPort": false
     },
     {
       "name": "frontend",

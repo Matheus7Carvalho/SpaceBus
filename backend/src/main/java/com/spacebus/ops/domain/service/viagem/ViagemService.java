@@ -9,11 +9,15 @@ import com.spacebus.ops.domain.repository.rota.RotaRepository;
 import com.spacebus.ops.domain.repository.usuario.UsuarioRepository;
 import com.spacebus.ops.domain.repository.veiculo.VeiculoRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
+import com.spacebus.ops.domain.service.reserva.IReservaService;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
@@ -29,15 +33,17 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
     private final RotaRepository rotaRepository;
     private final VeiculoRepository veiculoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final IReservaService reservas;
     private final Clock clock;
 
     protected ViagemService(final ViagemRepository repository, final RotaRepository rotaRepository,
                             final VeiculoRepository veiculoRepository, final UsuarioRepository usuarioRepository,
-                            final Clock clock) {
+                            final IReservaService reservas, final Clock clock) {
         super(repository);
         this.rotaRepository = rotaRepository;
         this.veiculoRepository = veiculoRepository;
         this.usuarioRepository = usuarioRepository;
+        this.reservas = reservas;
         this.clock = clock;
     }
 
@@ -53,9 +59,10 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
     @Override
     @Transactional
     public Viagem update(Viagem alterada, String id) throws DomainException {
-        var existente = buscar(id);
+        var existente = travar(id);
         if (existente.getStatus() == CANCELADA) throw new DomainException("Viagem cancelada não pode ser alterada.");
         resolverReferencias(alterada);
+        validarReservas(existente, alterada);
         existente.setRota(alterada.getRota());
         existente.setVeiculo(alterada.getVeiculo());
         existente.setMotorista(alterada.getMotorista());
@@ -86,7 +93,7 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
     @Override
     @Transactional
     public Viagem publicar(String id) {
-        var viagem = buscar(id);
+        var viagem = travar(id);
         exigirStatus(viagem, Set.of(RASCUNHO, SUSPENSA), "Só viagens em rascunho ou suspensas podem ser publicadas.");
         validate(viagem);
         return mudarStatus(viagem, PUBLICADA);
@@ -95,17 +102,30 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
     @Override
     @Transactional
     public Viagem suspender(String id) {
-        var viagem = buscar(id);
+        var viagem = travar(id);
         exigirStatus(viagem, Set.of(PUBLICADA), "Só viagens publicadas podem ser suspensas.");
         return mudarStatus(viagem, SUSPENSA);
     }
 
     @Override
     @Transactional
-    public Viagem cancelar(String id) {
-        var viagem = buscar(id);
+    public Viagem cancelar(String id, String responsavelId) {
+        var viagem = travar(id);
         if (viagem.getStatus() == CANCELADA) throw new DomainException("A viagem já está cancelada.");
-        return mudarStatus(viagem, CANCELADA);
+        var cancelada = mudarStatus(viagem, CANCELADA);
+        reservas.cancelarPorViagem(id, responsavelId);
+        return cancelada;
+    }
+
+    /** "Sem dia" vai até um horizonte longo em vez de deixar o fim aberto (parâmetro sempre tipado). */
+    private static final int HORIZONTE_ANOS = 10;
+
+    @Override
+    public Page<Viagem> agenda(LocalDate dia, String rotaId, StatusViagem status, Pageable pageable) {
+        var inicio = (dia != null ? dia : LocalDate.now(clock)).atStartOfDay();
+        var fim = dia != null ? inicio.plusDays(1) : inicio.plusYears(HORIZONTE_ANOS);
+        var rota = rotaId == null || rotaId.isBlank() ? null : rotaId;
+        return getRepository().agenda(inicio, fim, rota, status == null ? null : status.name(), pageable);
     }
 
     /** Publicada ou suspensa já foi oferecida ao passageiro: sai do ar por cancelamento, não por exclusão. */
@@ -140,6 +160,26 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
             viagem.setMotorista(motorista);
         }
         if (viagem.getPartida() != null) viagem.setPartida(viagem.getPartida().truncatedTo(ChronoUnit.MINUTES));
+    }
+
+    /**
+     * Com reservas, a viagem não troca de rota (o trecho reservado deixaria de existir) e a capacidade
+     * não fica abaixo dos lugares já reservados.
+     */
+    private void validarReservas(Viagem existente, Viagem alterada) {
+        var ocupados = reservas.lugaresOcupados(existente.getId());
+        if (ocupados == 0) return;
+        if (!existente.getRota().getId().equals(alterada.getRota().getId())) {
+            throw new DomainException("Viagem com reservas não pode trocar de rota.");
+        }
+        if (alterada.getCapacidade() < ocupados) {
+            throw new DomainException("Já há %d lugares reservados nesta viagem. A capacidade não pode ser menor.", ocupados);
+        }
+    }
+
+    /** Trava a viagem (mesma trava das reservas): transições e edição não correm junto com uma reserva. */
+    private Viagem travar(String id) {
+        return getRepository().travar(id).orElseThrow(() -> new EntityNotFoundException("Item não encontrado."));
     }
 
     private Viagem buscar(String id) {

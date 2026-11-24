@@ -31,7 +31,7 @@ Rota ────┘        │                                               �
 | **Localização** | Última posição da viagem em andamento enviada pelo celular do motorista (só a última, sem trajeto; apagada 24 h após o encerramento), com hora da atualização; desatualizada após 2 min | `LocalizacaoViagem`, `LocalizacaoService`, `/api/motorista/viagem`, `/api/reserva/{id}/localizacao`, telas `/motorista/viagens` e bloco na reserva e na viagem | Implementado |
 | **Notificação** | Mensagem transacional ao passageiro (confirmação, partida alterada, cancelamento, van saiu, lembrete 1 h antes), na aplicação e por canal externo (e-mail; WhatsApp só com consentimento). Gerada depois do commit, sem duplicar (chave única); falha de entrega não muda a reserva | `Notificacao`, `NotificacaoEnvio`, `CanalNotificacao` (no piloto, `CanalNotificacaoSimulado`), `/api/notificacao`, tela `/notificacoes` e sino no cabeçalho | Implementado (canais simulados) |
 
-Perfis (`Perfil`): `ADMINISTRADOR` (equipe Space Bus), `OPERADOR` (transportadora), `MOTORISTA`, `PASSAGEIRO`. Menu: **Motorista** (Minhas viagens, só Motorista), **Operação** (Viagens), **Cadastros** (Rotas, Veículos), **Passageiro** (Buscar viagens, para todos os perfis; Minhas reservas e Notificações, só Passageiro). **Trecho** é o par embarque → desembarque do passageiro dentro do percurso da rota. "Lugares" é o termo de tela para capacidade.
+Perfis (`Perfil`): `ADMINISTRADOR` (equipe Space Bus), `OPERADOR` (transportadora), `MOTORISTA`, `PASSAGEIRO`. Menu: **Motorista** (Minhas viagens, só Motorista), **Operação** (Viagens, Indicadores), **Cadastros** (Rotas, Veículos), **Passageiro** (Buscar viagens, para todos os perfis; Minhas reservas e Notificações, só Passageiro). **Trecho** é o par embarque → desembarque do passageiro dentro do percurso da rota. "Lugares" é o termo de tela para capacidade.
 
 ## Decisões de arquitetura
 
@@ -335,7 +335,7 @@ Ordem dos módulos (detalhe em `docs/escopo-mvp.md`). Um módulo só começa dep
 3. **Reserva e pagamento** — entregue para teste. Premissas do piloto (quantidade de lugares, 10 min de bloqueio, pagamento simulado, cancelamento até 2 h antes) em `docs/modulo-03-reserva-pagamento.md`.
 4. **Localização** da viagem ativa — entregue para teste. Premissas do piloto (janela de início, envio a cada 15 s, desatualizada após 2 min, retenção de 24 h, tela do celular ligada) em `docs/modulo-04-localizacao.md`.
 5. **Notificações** — entregue para teste. Na aplicação + e-mail e WhatsApp simulados (WhatsApp com consentimento); premissas em `docs/modulo-05-notificacoes.md`.
-6. **Indicadores básicos** (viagens, lugares vendidos, ocupação por horário).
+6. **Indicadores básicos** — entregue para teste. Tela `/operacao/indicadores` (`/api/indicador`): viagens, lugares vendidos (reservas confirmadas), ocupação ponderada e por horário, por consultas agregadas (`IndicadorRepository`); premissas em `docs/modulo-06-indicadores.md`.
 
 Fora do MVP: ver `docs/escopo-mvp.md`. Decisões pendentes (cidade, provedor de pagamento, assento numerado, prazo de bloqueio…) não são inventadas: registre a premissa adotada no doc do módulo.
 

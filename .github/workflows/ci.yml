@@ -74,6 +74,8 @@ jobs:
     env:
       # Mesmo fuso da operação: os specs calculam "hoje" e "amanhã" com o relógio local.
       TZ: America/Araguaina
+      # Endpoints de apoio ao E2E (/api/dev/**): no container só existem com o perfil e2e.
+      BACKEND_PERFIS: docker,e2e
       E2E_BASE_URL: http://localhost:5173
       # O backend no container leva mais que o dev local para responder na primeira vez.
       E2E_SAUDE_PRAZO_MS: '180000'

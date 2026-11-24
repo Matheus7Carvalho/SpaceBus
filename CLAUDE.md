@@ -318,7 +318,7 @@ Testes instáveis (flaky) são defeito, não azar. Regras:
   - `expect.poll` para estilos com transição.
 - **Mensagens repetíveis (toasts):** não usá-las como prova de que *esta* ação terminou.
 - **Dados da seed são somente leitura nos testes.** Testes que mexem num registro da seed não salvam; os que precisam salvar criam o próprio registro e o apagam no `afterEach`.
-- **Registro que a regra de negócio não deixa excluir** (ex.: viagem cancelada): use nome/descrição com prefixo `E2E` e partida aleatória. O `global-teardown` do Playwright apaga esses dados ao fim da suíte por `DELETE /api/dev/dados-teste?marca=E2E` (só perfil dev, só Administrador).
+- **Registro que a regra de negócio não deixa excluir** (ex.: viagem cancelada): use nome/descrição com prefixo `E2E` e partida aleatória. O `global-teardown` do Playwright apaga esses dados ao fim da suíte por `DELETE /api/dev/dados-teste?marca=E2E` (só perfis `dev` e `e2e` — este ligado pela CI —, só Administrador).
 - **Ambiente estável:**
   - não rodar o E2E enquanto containers reiniciam;
   - não compilar o backend (`mvnw test`/`compile`) com o backend dev no ar durante o E2E: o devtools recarrega no meio da compilação e o login quebra;

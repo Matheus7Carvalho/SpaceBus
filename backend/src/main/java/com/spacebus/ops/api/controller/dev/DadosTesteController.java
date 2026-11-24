@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** Dados dos testes E2E. Só no perfil dev e só para Administrador (SecurityConfiguration). */
 @RestController
-@Profile("dev")
+@Profile({"dev", "e2e"})
 @RequestMapping(value = "/api/dev/dados-teste", produces = "application/json")
 @Tag(name = "Desenvolvimento", description = "Apoio aos testes automatizados; ausente fora do perfil dev.")
 public class DadosTesteController {

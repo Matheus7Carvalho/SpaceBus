@@ -24,7 +24,8 @@ services:
     profiles: [app]
     build: ./backend
     environment:
-      SPRING_PROFILES_ACTIVE: docker
+      # A CI acrescenta "e2e" para liberar os endpoints de apoio ao teste (/api/dev/**).
+      SPRING_PROFILES_ACTIVE: ${BACKEND_PERFIS:-docker}
       SPACEBUS_TRANSPORTADORA: ${SPACEBUS_TRANSPORTADORA:-Transportadora piloto}
       POSTGRES_DB: ${POSTGRES_DB:-spacebus}
       POSTGRES_USER: ${POSTGRES_USER:-spacebus}

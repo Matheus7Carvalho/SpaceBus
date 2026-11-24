@@ -80,8 +80,8 @@ Roteiro exploratório:
 | D6 | Editar rota não atualizava a busca nem a agenda em cache | Baixa | Corrigido |
 | D7 | Nome acessível do resultado diferente do texto visível (WCAG 2.5.3) | Baixa | Corrigido |
 | — | Lacunas: filtros de rota/situação no banco, "Mostrar mais", ordem dos resultados, asserção da viagem suspensa | — | Cobertas por E2E |
-| D5 | "Hoje" do campo de data usa o fuso do navegador; o servidor usa `APP_FUSO_HORARIO` | Baixa | **Pendente** (só afeta quem está em outro fuso perto da meia-noite; o servidor continua a regra) |
-| D8 | E2E deixa rotas `E2E-…` e viagens canceladas no banco de dev (também no módulo 1) | Média (higiene) | **Pendente**: endpoint de limpeza por marca, só no perfil dev |
-| D9 | `locais()` e a busca carregam viagens com rota/pontos por consulta | Baixa | **Pendente**: aceitável no volume do piloto; rever com dados reais |
+| D5 | "Hoje" do campo de data usa o fuso do navegador; o servidor usa `APP_FUSO_HORARIO` | Baixa | Corrigido em 24/11: a sessão informa `fusoHorario` e `useAgora()` calcula "agora" e "hoje" nesse fuso. E2E com o navegador em UTC+14 |
+| D8 | E2E deixa rotas `E2E-…` e viagens canceladas no banco de dev (também no módulo 1) | Média (higiene) | Corrigido em 24/11: `DELETE /api/dev/dados-teste?marca=E2E` (só perfil dev, só Administrador) apaga rotas e veículos com a marca e as viagens canceladas fora da seed, com reservas, pagamentos e histórico. O `global-teardown` do Playwright chama ao fim da suíte. Teste de integração com PostgreSQL |
+| D9 | `locais()` e a busca carregam viagens com rota/pontos por consulta | Baixa | Corrigido em 24/11: rota, pontos, rotina e veículo na mesma consulta; lugares de todas as viagens numa consulta só. A causa principal era a `rotina` (OneToOne inverso EAGER): em rota sem rotina, o Hibernate refazia a consulta a cada viagem. Teste de integração conta as consultas (iguais com 2 e 6 viagens) na busca, nos locais e na agenda |
 
 Lacuna registrada: as consultas JPQL do caso "partida ainda hoje" não têm teste com banco (`@DataJpaTest` com Postgres em container entra quando o projeto adotar Testcontainers).

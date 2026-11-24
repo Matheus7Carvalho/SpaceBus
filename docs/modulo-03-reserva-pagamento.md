@@ -94,9 +94,53 @@ Ressalvas novas:
 | N4 | Cancelar a viagem podia sobrescrever uma expiração em andamento | Baixa | Corrigido: cada reserva é relida com trava antes de cancelar |
 | N5 | Ordem do histórico podia empatar na mesma transação | Baixa | Corrigido: coluna `ordem` (identity do banco) |
 | N6 | Cancelar reserva vencida mostrava a mensagem das 2 horas | Baixa | Corrigido: mensagem do prazo de pagamento |
-| N2 | Chamada ao provedor (criar cobrança, reembolsar) acontece com a trava da viagem segura e sem timeout | Média | **Pendente** para a integração do provedor real: chamar o provedor fora da transação (ou com timeout curto e retry limitado). Inofensivo com o provedor simulado |
-| N7 | Acesso à lista de passageiros registrado só em log (`auditoria`), não persistido | Baixa | **Pendente** (premissa do piloto); persistir quando houver tela de auditoria |
+| N2 | Chamada ao provedor (criar cobrança, reembolsar) acontece com a trava da viagem segura e sem timeout | Média | Corrigido em 24/11 (ver abaixo) |
+| N7 | Acesso à lista de passageiros registrado só em log (`auditoria`), não persistido | Baixa | Corrigido em 24/11: tabela `auditoria_acesso` (usuário, perfil, ação, viagem, data), gravada antes de a lista sair. A tela de auditoria fica para quando houver demanda |
 
-Lacunas de teste registradas: integração de expiração em lote × retorno do provedor, e de cancelamento da viagem × expiração.
+Lacunas de teste registradas: integração de expiração em lote × retorno do provedor, e de cancelamento da viagem × expiração. **Cobertas em 24/11** (abaixo).
 
-Testes finais: backend 222 (inclui 5 de integração com PostgreSQL real); E2E 161 passaram e 0 falharam.
+### Fechamento das ressalvas (24/11/2026)
+
+**N2: provedor fora da trava, com tempo limite e tentativas limitadas.**
+
+- **Porta única para o provedor.** Toda chamada passa por `ClienteProvedorPagamento`, que tem tempo limite (`SPACEBUS_PAGAMENTO_TIMEOUT_MS`, padrão 5 s). Tempo esgotado ou erro vira `ProvedorPagamentoException`.
+- **Criar cobrança.** São duas transações curtas, com o provedor chamado entre elas:
+  1. trava, confere a reserva e calcula a chave de idempotência (reserva + nº de cobranças);
+  2. trava de novo, confere outra vez e grava.
+- **Chamadas simultâneas** recebem a mesma cobrança (chave igual). Se a reserva vencer enquanto o provedor responde, a cobrança não é gravada.
+- **Reembolso.** A transação só marca `REEMBOLSO_PENDENTE` e publica `ReembolsoSolicitado`. O `ProcessadorReembolsos` chama o provedor depois do commit, sem trava, e grava o resultado travando só a cobrança.
+- **Falha no reembolso.** Conta uma tentativa. A tarefa agendada tenta de novo até `SPACEBUS_REEMBOLSO_MAX_TENTATIVAS` (padrão 12, uma por 5 min); depois disso, log de erro para ação manual. O histórico mostra "Reembolso pendente" uma vez só.
+
+**Defeito novo encontrado pelos testes de integração (corrigido).** O cancelamento da viagem lia as reservas antes de travá-las. O `travar` devolvia a entidade que já estava na sessão do Hibernate, com a situação antiga. Assim, uma reserva expirada no meio do cancelamento voltava a ser marcada como cancelada: a correção da N4 não tinha efeito real. Agora os ids vêm de uma consulta escalar (`idsDaViagemComStatus`) e cada reserva é lida já travada, como manda a ordem de travas.
+
+**Dados de dev.** O changeset que renova a seed prendia no passado a viagem com qualquer reserva, mesmo cancelada. Agora só reserva que segura lugar impede a renovação (ver [testes-instaveis.md](testes-instaveis.md)).
+
+Testes novos com PostgreSQL real (`ReservaConcorrenciaIntegracaoTest`):
+- retorno do provedor durante a expiração em lote;
+- cancelamento da viagem durante a expiração, nas duas ordens;
+- provedor lento não segura a viagem;
+- pagamento iniciado duas vezes ao mesmo tempo gera uma cobrança só.
+
+Unitários: `ProcessadorReembolsosTest` e `ClienteProvedorPagamentoTest`.
+
+### Rodada 3 do QA (24/11/2026): **Aprovado com ressalvas**
+
+Validação dos itens N2, N7, D5, D8, D9, das lacunas de teste e da correção do cancelamento da viagem: todos OK. Na primeira passada, o QA apontou duas ressalvas médias, corrigidas e reconfirmadas na API viva:
+
+| # | Ressalva | Severidade | Situação |
+|---|---|---|---|
+| R1 | A limpeza de dados E2E apagava qualquer viagem cancelada fora da seed, inclusive de operação real (e a rotina recriaria a viagem) | Média | Corrigido: só sai o que tem a marca. Os testes que criam viagem pela API usam a van `VAN_E2E` (criada no `global-setup`, apagada no teardown). Teste `viagemCanceladaSemAMarcaFica` |
+| R2 | Id de viagem com mais de 36 caracteres na lista de passageiros dava erro de banco com SQL na resposta; id inexistente gerava auditoria | Baixa/média | Corrigido: 404 antes de auditar |
+| R3 | Reembolsos do cancelamento da viagem rodam em série na própria requisição (até 5 s cada) | Baixa | Aberta: rever com o provedor real (`@Async` ou só agendador) |
+| R4 | Cobrança criada enquanto a reserva vence fica aberta no provedor | Baixa | Aberta: cancelar a cobrança no provedor real |
+| R5 | Mapa de idempotência do provedor simulado cresce sem limite | Baixa | Aberta (só simulado) |
+| R6 | Perfil padrão `dev` expõe o endpoint de limpeza se `SPRING_PROFILES_ACTIVE` faltar | Baixa | Aberta |
+| R7 | `DELETE /api/dev/dados-teste` sem `marca` responde ProblemDetail, não `ResponseError` | Baixa | Aberta |
+| R8 | E2E do fuso só distingue os fusos a partir das 07:00 no fuso da operação | Baixa | Aberta |
+| R10 | `SPACEBUS_PAGAMENTO_TIMEOUT_MS` e `SPACEBUS_REEMBOLSO_MAX_TENTATIVAS` fora do README e do `compose.yaml` | Baixa | Aberta (têm padrão; estão no `.env.example`) |
+| R11 | Duas tentativas simultâneas de reembolso que falham contam duas tentativas | Baixa | Aberta |
+| R12 | `global-setup` e `idDaVanE2E` procuram a van em até 500 veículos | Baixa | Aberta |
+
+Testes finais: backend 257 (10 + 5 + 3 de integração com PostgreSQL real); E2E 163 passaram, 1 pulado (gaveta, só no celular), 0 falharam.
+
+Testes finais da rodada 2: backend 222 (inclui 5 de integração com PostgreSQL real); E2E 161 passaram e 0 falharam.

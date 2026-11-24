@@ -123,8 +123,9 @@ Regras:
 - Transições de status (publicar, suspender, cancelar, iniciar, encerrar) são endpoints explícitos (`POST /api/viagem/{id}/publicar`), não `PUT` genérico. O `*Request` de edição não carrega o status.
 - Erro de regra de negócio: lançar `DomainException` com mensagem curta em pt-BR. O `RestExceptionHandler` converte para `ResponseError`.
 - Mudanças de status de reserva e pagamento gravam histórico (entidade, ação, responsável, data, resultado) a partir do módulo 3; o acesso administrativo deve ser registrado (escopo, seção 3).
-- **Ordem de travas na reserva:** sempre **viagem → reserva → pagamento** (`ViagemRepository.travar`, `ReservaRepository.travar`, `PagamentoRepository.travarPorProvedorId`). Descubra os ids por consulta escalar e só leia as entidades **depois** de travar; ler antes deixa dados velhos na sessão do Hibernate (foi o defeito D1 do módulo 3). Tarefas em lote usam `SKIP LOCKED`. Concorrência se prova com `ReservaConcorrenciaIntegracaoTest` (Testcontainers, PostgreSQL real).
+- **Ordem de travas na reserva:** sempre **viagem → reserva → pagamento** (`ViagemRepository.travar`, `ReservaRepository.travar`, `PagamentoRepository.travarPorProvedorId`). Descubra os ids por consulta escalar e só leia as entidades **depois** de travar; ler antes deixa dados velhos na sessão do Hibernate (defeito D1 do módulo 3 e, de novo, no cancelamento da viagem em 24/11). Tarefas em lote usam `SKIP LOCKED`. Concorrência se prova com `ReservaConcorrenciaIntegracaoTest` (Testcontainers, PostgreSQL real).
 - **Módulos críticos** (reserva, pagamento, localização): concorrência e idempotência com teste. Nunca duas vendas da mesma vaga (trava/constraint no banco, não só checagem em memória); webhook de pagamento repetido não duplica efeito; serviço externo com timeout, retry limitado e fallback, sem mudar o estado real por falha de entrega.
+- **Provedor de pagamento:** só via `ClienteProvedorPagamento` (tempo limite) e **nunca com trava segura**. Cobrança: duas transações curtas com a chamada entre elas e chave de idempotência. Reembolso: marcar `REEMBOLSO_PENDENTE` e publicar `ReembolsoSolicitado`; o `ProcessadorReembolsos` chama o provedor depois do commit, com tentativas limitadas.
 - Autorização por perfil verificada no servidor, não só no frontend.
 - Controllers não contêm regra de negócio; apenas delegam ao serviço.
 - Testes de serviço para todas as regras. Controllers com `@WebMvcTest`, importando `SecurityConfiguration` e `PasswordConfiguration`.
@@ -317,7 +318,7 @@ Testes instáveis (flaky) são defeito, não azar. Regras:
   - `expect.poll` para estilos com transição.
 - **Mensagens repetíveis (toasts):** não usá-las como prova de que *esta* ação terminou.
 - **Dados da seed são somente leitura nos testes.** Testes que mexem num registro da seed não salvam; os que precisam salvar criam o próprio registro e o apagam no `afterEach`.
-- **Registro que a regra de negócio não deixa excluir** (ex.: viagem cancelada): use nome/descrição com prefixo `E2E` e partida aleatória. Um endpoint de limpeza por marca (só no perfil dev, só Administrador) entra quando o volume de dados de teste atrapalhar.
+- **Registro que a regra de negócio não deixa excluir** (ex.: viagem cancelada): use nome/descrição com prefixo `E2E` e partida aleatória. O `global-teardown` do Playwright apaga esses dados ao fim da suíte por `DELETE /api/dev/dados-teste?marca=E2E` (só perfil dev, só Administrador).
 - **Ambiente estável:**
   - não rodar o E2E enquanto containers reiniciam;
   - não compilar o backend (`mvnw test`/`compile`) com o backend dev no ar durante o E2E: o devtools recarrega no meio da compilação e o login quebra;

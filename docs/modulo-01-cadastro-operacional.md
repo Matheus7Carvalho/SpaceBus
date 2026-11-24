@@ -113,7 +113,7 @@ Defeitos apontados pelo QA:
 | D3 | Inativar um veículo não afetava as viagens já publicadas. | Média | Corrigido: veículo com viagens futuras não canceladas não pode ser inativado. Coberto por teste de serviço e E2E. |
 | D4 | O conflito "mesmo veículo, mesmo horário" era checado só na aplicação, o que falha sob concorrência. | Baixa/média | Corrigido: índice único parcial `uk_viagem_veiculo_partida_ativa`. |
 | D6 | O `nginx.conf` ainda tinha um resto do SmartMall (limite de upload). | Baixa | Corrigido. |
-| D2 | A lista de viagens busca no máximo 500 registros e filtra no cliente. | Média | **Pendente.** Paginação e filtro no servidor entram com a busca do passageiro (módulo 2). |
+| D2 | A lista de viagens busca no máximo 500 registros e filtra no cliente. | Média | Corrigido no módulo 2 (história H7): agenda paginada e filtrada no servidor. Em 24/11, a agenda passou a carregar rota, rotina e veículo na mesma consulta (sem uma consulta por viagem). |
 | D5 | As partidas da seed são calculadas na carga e ficam no passado depois de 1 a 3 dias. | Baixa | Corrigido em 23/11: changeset só de dev (`runAlways`) traz as viagens da seed de volta para os próximos dias a cada subida. |
 
 Lacunas de teste registradas para a próxima iteração:

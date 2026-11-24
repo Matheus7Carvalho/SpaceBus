@@ -33,7 +33,7 @@ Testar, em operação limitada, se passageiros conseguem **encontrar, acompanhar
 | 3 | **Reserva e pagamento** | 4.3: reserva com código, bloqueio temporário da vaga, provedor externo, sem dupla venda | **Aprovado com ressalvas** ([modulo-03-reserva-pagamento.md](modulo-03-reserva-pagamento.md)) |
 | 4 | **Localização da viagem** | 4.2: posição pelo celular do motorista, hora da última atualização, aviso de dado desatualizado | **Aprovado com ressalvas** ([modulo-04-localizacao.md](modulo-04-localizacao.md)) |
 | 5 | **Notificações** | 4.5: confirmação, alteração/cancelamento, lembrete; WhatsApp com consentimento | **Aprovado com ressalvas** ([modulo-05-notificacoes.md](modulo-05-notificacoes.md)) |
-| 6 | Indicadores básicos | 4.6: viagens, lugares vendidos, ocupação por horário | A fazer |
+| 6 | **Indicadores básicos** | 4.6: viagens, lugares vendidos, ocupação por horário | **Aprovado com ressalvas** ([modulo-06-indicadores.md](modulo-06-indicadores.md)) |
 
 ## Requisitos de aceite do MVP (seção 5, resumidos)
 

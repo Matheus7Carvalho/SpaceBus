@@ -6,6 +6,7 @@ import { RequirePerfil } from '@/features/auth/components/require-perfil'
 import { BuscaDetalhePage } from '@/pages/busca-detalhe-page'
 import { BuscaPage } from '@/pages/busca-page'
 import { HomeRedirect } from '@/pages/home-redirect'
+import { IndicadoresPage } from '@/pages/indicadores-page'
 import { LoginPage } from '@/pages/login-page'
 import { MotoristaViagensPage } from '@/pages/motorista-viagens-page'
 import { NotFoundPage } from '@/pages/not-found-page'
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <HomeRedirect /> },
+      { path: 'operacao/indicadores', element: protegida('/operacao/indicadores', <IndicadoresPage />) },
       { path: 'notificacoes', element: protegida('/notificacoes', <NotificacoesPage />) },
       { path: 'motorista/viagens', element: protegida('/motorista/viagens', <MotoristaViagensPage />) },
       cadastro('/operacao/viagens', <ViagensPage />, <ViagemFormPage />, 'nova'),

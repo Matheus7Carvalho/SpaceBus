@@ -19,7 +19,7 @@ MVP para passageiros encontrarem, acompanharem, reservarem e pagarem viagens de 
 | 3 | [Reserva e pagamento](docs/modulo-03-reserva-pagamento.md): reserva com código, bloqueio de 10 min, pagamento simulado, minhas reservas, cancelamento com reembolso, passageiros por viagem | Em teste |
 | 4 | [Localização da viagem](docs/modulo-04-localizacao.md): motorista inicia e encerra a viagem e o celular transmite a posição; passageiro e operação acompanham no mapa, com aviso de dado desatualizado | Em desenvolvimento |
 | 5 | [Notificações](docs/modulo-05-notificacoes.md): avisos ao passageiro na aplicação (sino e tela Notificações) para confirmação, horário alterado, viagem cancelada, van saiu e lembrete 1 h antes; e-mail e WhatsApp (com opt-in) simulados | Em desenvolvimento |
-| 6 | Indicadores | A fazer ([docs/escopo-mvp.md](docs/escopo-mvp.md)) |
+| 6 | [Indicadores](docs/modulo-06-indicadores.md): viagens, lugares vendidos, ocupação por horário e por viagem, receita (simulada), por período e rota (`/operacao/indicadores`) | Em desenvolvimento |
 
 ## Requisitos
 
@@ -66,8 +66,8 @@ Criadas pela seed do Liquibase (contexto `dev`). A tela de login tem atalhos par
 
 | Perfil | E-mail | Senha | Acessa hoje |
 |---|---|---|---|
-| Administrador | `admin@spacebus.local` | `demo123` | Viagens, Rotas, Veículos, Buscar viagens |
-| Operador | `operador@spacebus.local` | `demo123` | Viagens, Rotas, Veículos, Buscar viagens |
+| Administrador | `admin@spacebus.local` | `demo123` | Viagens, Indicadores, Rotas, Veículos, Buscar viagens |
+| Operador | `operador@spacebus.local` | `demo123` | Viagens, Indicadores, Rotas, Veículos, Buscar viagens |
 | Motorista | `motorista@spacebus.local` | `demo123` | Minhas viagens, Buscar viagens |
 | Passageiro | `passageiro@spacebus.local` | `demo123` | Buscar viagens, Minhas reservas, Notificações |
 

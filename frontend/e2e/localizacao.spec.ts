@@ -140,12 +140,14 @@ test.describe('Motorista', () => {
     await page.clock.runFor(16_000)
     await expect(transmissao(page)).toContainText('Sem conexão · 2 na fila')
 
-    const lote = page.waitForRequest((r) => r.url().endsWith(`/api/motorista/viagem/${c.viagemId}/localizacao`) && r.method() === 'POST')
+    // Sincroniza pela resposta (não pelo pedido): sob carga, o envio do segundo tique pode ter saído ainda offline e
+    // ficar pendente até a rede voltar; o evento de pedido já passou, mas a resposta chega agora com o lote de 2.
     const resposta = respostaDe(page, `/api/motorista/viagem/${c.viagemId}/localizacao`)
     await context.setOffline(false)
     await page.clock.runFor(16_000)
-    expect(((await lote).postDataJSON() as { posicoes: unknown[] }).posicoes).toHaveLength(2)
-    expect((await resposta).ok()).toBe(true)
+    const lote = await resposta
+    expect(lote.ok()).toBe(true)
+    expect((lote.request().postDataJSON() as { posicoes: unknown[] }).posicoes).toHaveLength(2)
     await expect(transmissao(page)).toContainText('Transmitindo')
     await expect(transmissao(page)).not.toContainText('Sem conexão')
   })

@@ -1,4 +1,4 @@
-import { BellIcon, BusIcon, CalendarClockIcon, NavigationIcon, RouteIcon, SearchIcon, TicketIcon, type LucideIcon } from 'lucide-react'
+import { BarChart3Icon, BellIcon, BusIcon, CalendarClockIcon, NavigationIcon, RouteIcon, SearchIcon, TicketIcon, type LucideIcon } from 'lucide-react'
 import { temPerfil } from '@/features/auth/permissoes'
 import type { Perfil } from '@/features/auth/types'
 
@@ -30,7 +30,10 @@ export const navGrupos: readonly NavGrupo[] = [
   },
   {
     titulo: 'Operação',
-    itens: [{ title: 'Viagens', to: '/operacao/viagens', icon: CalendarClockIcon, perfis: OPERACAO }],
+    itens: [
+      { title: 'Viagens', to: '/operacao/viagens', icon: CalendarClockIcon, perfis: OPERACAO },
+      { title: 'Indicadores', to: '/operacao/indicadores', icon: BarChart3Icon, perfis: OPERACAO },
+    ],
   },
   {
     titulo: 'Cadastros',

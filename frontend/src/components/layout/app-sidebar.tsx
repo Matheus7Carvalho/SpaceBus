@@ -1,4 +1,3 @@
-import { BusIcon } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router'
 import {
   Sidebar,
@@ -24,8 +23,8 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <BusIcon className="size-5 shrink-0 text-sidebar-primary" aria-hidden />
-          <span className="truncate font-semibold group-data-[collapsible=icon]:hidden">SpaceBus</span>
+          <img src="/favicon.svg" alt="" className="size-6 shrink-0" />
+          <span className="truncate text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden">SpaceBus</span>
         </div>
       </SidebarHeader>
       <SidebarContent>

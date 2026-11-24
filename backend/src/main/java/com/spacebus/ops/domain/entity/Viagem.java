@@ -51,7 +51,7 @@ public class Viagem extends BaseEntity {
     private Integer capacidade;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "STATUS", nullable = false, length = 10)
+    @Column(name = "STATUS", nullable = false, length = 12)
     private StatusViagem status;
 
     /** Rotina (Rota Fixa) que gerou a viagem; nulo se programada à mão. */
@@ -59,7 +59,26 @@ public class Viagem extends BaseEntity {
     @JoinColumn(name = "ROTINA_ID")
     private Rotina rotina;
 
+    @Column(name = "INICIADA_EM", columnDefinition = "TIMESTAMP")
+    private LocalDateTime iniciadaEm;
+
+    /** Id do usuário que iniciou (motorista, operador ou administrador). */
+    @Column(name = "INICIADA_POR", length = 36)
+    private String iniciadaPor;
+
+    @Column(name = "ENCERRADA_EM", columnDefinition = "TIMESTAMP")
+    private LocalDateTime encerradaEm;
+
+    /** Nulo quando encerrada automaticamente. */
+    @Column(name = "ENCERRADA_POR", length = 36)
+    private String encerradaPor;
+
     public Viagem(Rota rota, Veiculo veiculo, Usuario motorista, LocalDateTime partida, BigDecimal preco, Integer capacidade, StatusViagem status) {
         this(rota, veiculo, motorista, partida, preco, capacidade, status, null);
+    }
+
+    public Viagem(Rota rota, Veiculo veiculo, Usuario motorista, LocalDateTime partida, BigDecimal preco, Integer capacidade,
+                  StatusViagem status, Rotina rotina) {
+        this(rota, veiculo, motorista, partida, preco, capacidade, status, rotina, null, null, null, null);
     }
 }

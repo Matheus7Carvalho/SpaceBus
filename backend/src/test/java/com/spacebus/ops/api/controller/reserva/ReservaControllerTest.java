@@ -15,8 +15,10 @@ import com.spacebus.ops.domain.entity.enums.StatusPagamento;
 import com.spacebus.ops.domain.entity.enums.StatusReserva;
 import com.spacebus.ops.domain.entity.enums.StatusViagem;
 import com.spacebus.ops.domain.entity.enums.TipoVeiculo;
+import com.spacebus.ops.domain.model.localizacao.LocalizacaoResponse;
 import com.spacebus.ops.domain.model.reserva.ReservaRequest;
 import com.spacebus.ops.domain.model.reserva.RetornoPagamentoRequest;
+import com.spacebus.ops.domain.service.localizacao.ILocalizacaoService;
 import com.spacebus.ops.domain.service.reserva.IReservaService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -58,6 +60,7 @@ class ReservaControllerTest {
 
     @Autowired private MockMvc mvc;
     @MockitoBean private IReservaService service;
+    @MockitoBean private ILocalizacaoService localizacao;
     @MockitoBean private UserDetailsService userDetailsService;
 
     private static UsuarioAutenticado paula() {
@@ -113,6 +116,7 @@ class ReservaControllerTest {
                 .andExpect(jsonPath("$.valorTotal").value(37.0))
                 .andExpect(jsonPath("$.pagavel").value(true))
                 .andExpect(jsonPath("$.rotaNome").value("Centro – Aeroporto"))
+                .andExpect(jsonPath("$.situacaoViagem").value("PUBLICADA"))
                 .andExpect(jsonPath("$.passageiro").doesNotExist());
 
         var pedido = ArgumentCaptor.forClass(ReservaRequest.class);
@@ -166,5 +170,50 @@ class ReservaControllerTest {
         mvc.perform(post("/api/pagamento/webhook").header(PagamentoWebhookController.CABECALHO_SEGREDO, "segredo-teste")
                 .contentType(MediaType.APPLICATION_JSON).content(corpo)).andExpect(status().isNoContent());
         verify(service).processarRetorno("sim_1", RetornoPagamentoRequest.Resultado.APROVADO);
+    }
+
+    // --- Módulo 4: localização da van na reserva ---
+
+    @ParameterizedTest
+    @ValueSource(strings = {"OPERADOR", "ADMINISTRADOR", "MOTORISTA"})
+    void localizacaoDaReservaSoParaPassageiro(String perfil) throws Exception {
+        mvc.perform(get("/api/reserva/rs1/localizacao").with(user("u").roles(perfil))).andExpect(status().isForbidden());
+        verifyNoInteractions(localizacao);
+    }
+
+    @Test
+    void localizacaoSemSessaoResponde401() throws Exception {
+        mvc.perform(get("/api/reserva/rs1/localizacao")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(localizacao);
+    }
+
+    @Test
+    void passageiroVeALocalizacaoDaSuaReservaSemDadosDoMotorista() throws Exception {
+        when(localizacao.daReserva("rs1", "u1")).thenReturn(LocalizacaoResponse.builder().situacaoViagem(StatusViagem.EM_ANDAMENTO)
+                .disponivel(true).latitude(-10.18).longitude(-48.33).precisaoM(30.0).registradaEm(LocalDateTime.of(2026, 11, 18, 7, 5))
+                .segundosDesdeAtualizacao(150L).desatualizada(true).simulada(true).build());
+
+        mvc.perform(get("/api/reserva/rs1/localizacao").with(user(paula())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.situacaoViagem").value("EM_ANDAMENTO"))
+                .andExpect(jsonPath("$.disponivel").value(true))
+                .andExpect(jsonPath("$.precisaoM").value(30.0))
+                .andExpect(jsonPath("$.registradaEm").value("2026-11-18T07:05:00"))
+                .andExpect(jsonPath("$.segundosDesdeAtualizacao").value(150))
+                .andExpect(jsonPath("$.desatualizada").value(true))
+                .andExpect(jsonPath("$.simulada").value(true))
+                .andExpect(jsonPath("$.motoristaNome").doesNotExist())
+                .andExpect(jsonPath("$.diagnostico").doesNotExist());
+    }
+
+    @Test
+    void reservaDeOutroPassageiroResponde404ENaoConfirmadaRespondeAMensagem() throws Exception {
+        when(localizacao.daReserva("rs9", "u1")).thenThrow(new jakarta.persistence.EntityNotFoundException("Reserva não encontrada."));
+        when(localizacao.daReserva("rs1", "u1")).thenThrow(new com.spacebus.ops.domain.core.exception.DomainException("Localização disponível só para reservas confirmadas."));
+
+        mvc.perform(get("/api/reserva/rs9/localizacao").with(user(paula()))).andExpect(status().isNotFound());
+        mvc.perform(get("/api/reserva/rs1/localizacao").with(user(paula())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Localização disponível só para reservas confirmadas."));
     }
 }

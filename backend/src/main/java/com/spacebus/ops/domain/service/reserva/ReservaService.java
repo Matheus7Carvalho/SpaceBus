@@ -233,7 +233,9 @@ public class ReservaService implements IReservaService {
                 && reserva.getStatus() != StatusReserva.CANCELADA
                 && viagem.getStatus() == StatusViagem.PUBLICADA
                 && reserva.getQuantidade() <= viagem.getCapacidade() - reservaRepository.lugaresOcupados(viagem.getId(), agora, reserva.getId());
-        if (aindaVaiPartir && ((noPrazo && viagem.getStatus() != StatusViagem.CANCELADA) || cabeForaDoPrazo)) {
+        // No prazo, confirma com a viagem publicada ou suspensa; iniciada, encerrada ou cancelada não confirma (módulo 4).
+        var viagemAceita = viagem.getStatus() == StatusViagem.PUBLICADA || viagem.getStatus() == StatusViagem.SUSPENSA;
+        if (aindaVaiPartir && ((noPrazo && viagemAceita) || cabeForaDoPrazo)) {
             reserva.setStatus(StatusReserva.CONFIRMADA);
             reserva.setConfirmadaEm(agora);
             registrar(reserva, AcaoReserva.CONFIRMADA, OrigemAcao.PROVEDOR, null, null);
@@ -241,9 +243,19 @@ public class ReservaService implements IReservaService {
         }
         if (reserva.getStatus() == StatusReserva.AGUARDANDO_PAGAMENTO) {
             reserva.setStatus(StatusReserva.EXPIRADA);
-            registrar(reserva, AcaoReserva.EXPIRADA, OrigemAcao.PROVEDOR, null, "Pagamento aprovado depois do prazo, sem lugar.");
+            registrar(reserva, AcaoReserva.EXPIRADA, OrigemAcao.PROVEDOR, null, motivoDaExpiracao(viagem, aindaVaiPartir));
         }
         reembolsar(pagamento, OrigemAcao.PROVEDOR, null);
+    }
+
+    /** Detalhe do histórico quando a aprovação chega e a reserva não pode mais ser confirmada. */
+    private static String motivoDaExpiracao(Viagem viagem, boolean aindaVaiPartir) {
+        if (viagem.getStatus() == StatusViagem.EM_ANDAMENTO || viagem.getStatus() == StatusViagem.ENCERRADA) {
+            return "Pagamento aprovado depois do início da viagem.";
+        }
+        if (!aindaVaiPartir) return "Pagamento aprovado depois da partida.";
+        if (viagem.getStatus() == StatusViagem.CANCELADA) return "Pagamento aprovado depois do cancelamento da viagem.";
+        return "Pagamento aprovado depois do prazo, sem lugar.";
     }
 
     @Override

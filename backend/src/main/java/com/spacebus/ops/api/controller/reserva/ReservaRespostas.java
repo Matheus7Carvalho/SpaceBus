@@ -28,6 +28,7 @@ public class ReservaRespostas {
                 .motivoCancelamento(r.getMotivoCancelamento())
                 .viagemId(viagem.getId())
                 .rotaNome(viagem.getRota().getNome())
+                .situacaoViagem(viagem.getStatus())
                 .partida(viagem.getPartida())
                 .embarqueNome(r.getEmbarqueNome())
                 .embarqueReferencia(r.getEmbarqueReferencia())

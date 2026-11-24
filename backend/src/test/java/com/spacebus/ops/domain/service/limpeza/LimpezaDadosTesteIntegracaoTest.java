@@ -75,6 +75,7 @@ class LimpezaDadosTesteIntegracaoTest {
         jdbc.update("delete from reserva_historico");
         jdbc.update("delete from pagamento");
         jdbc.update("delete from reserva");
+        jdbc.update("delete from localizacao_viagem");
         jdbc.update("delete from viagem");
         jdbc.update("delete from rota");
         jdbc.update("delete from veiculo");
@@ -121,7 +122,7 @@ class LimpezaDadosTesteIntegracaoTest {
 
         var resultado = limpeza.limpar("E2E");
 
-        assertThat(resultado).isEqualTo(new LimpezaDadosTesteService.Resultado(3, 1, 1));
+        assertThat(resultado).isEqualTo(new LimpezaDadosTesteService.Resultado(3, 1, 1, 0));
         assertThat(viagemRepository.findAll()).extracting(Viagem::getId).containsExactly(publicadaReal.getId());
         assertThat(rotaRepository.findAll()).extracting(Rota::getNome).containsExactly("Centro – Aeroporto");
         assertThat(veiculoRepository.findAll()).extracting(Veiculo::getDescricao).containsExactly("Van Master");
@@ -139,7 +140,7 @@ class LimpezaDadosTesteIntegracaoTest {
         reservaPaga(cancelada);
         jdbc.update("update viagem set status = 'CANCELADA' where id = ?", cancelada.getId());
 
-        assertThat(limpeza.limpar("E2E")).isEqualTo(new LimpezaDadosTesteService.Resultado(0, 0, 0));
+        assertThat(limpeza.limpar("E2E")).isEqualTo(new LimpezaDadosTesteService.Resultado(0, 0, 0, 0));
         assertThat(viagemRepository.count()).isEqualTo(1);
         assertThat(reservaRepository.count()).isEqualTo(1);
         assertThat(pagamentoRepository.count()).isEqualTo(1);
@@ -154,5 +155,28 @@ class LimpezaDadosTesteIntegracaoTest {
                     .hasMessage("Informe uma marca de teste (ex.: E2E).");
         }
         assertThat(rotaRepository.count()).isEqualTo(1);
+    }
+
+    /** Módulo 4: motoristas de teste e as localizações das viagens de teste também saem; o motorista real fica. */
+    @Test
+    void apagaMotoristasDeTesteELocalizacaoDasViagensDeTeste() {
+        var motoristaTeste = usuarioRepository.save(new Usuario("E2E Motorista AB12", "e2e-" + UUID.randomUUID() + "@teste", "h", Perfil.MOTORISTA, true));
+        var motoristaReal = usuarioRepository.save(new Usuario("João Costa", "j-" + UUID.randomUUID() + "@teste", "h", Perfil.MOTORISTA, true));
+        var passageiroComMarca = usuarioRepository.save(new Usuario("E2E Passageira", "pe2e-" + UUID.randomUUID() + "@teste", "h", Perfil.PASSAGEIRO, true));
+        var vanTeste = veiculo("E2E Van " + placa);
+        var deTeste = viagemRepository.save(new Viagem(rota("Linha"), vanTeste, motoristaTeste, LocalDateTime.now().plusMinutes(10),
+                new BigDecimal("15.00"), 10, StatusViagem.EM_ANDAMENTO));
+        jdbc.update("update viagem set iniciada_por = ? where id = ?", motoristaTeste.getId(), deTeste.getId());
+        jdbc.update("insert into localizacao_viagem (id, data_criacao, viagem_id, latitude, longitude) values (?, now(), ?, 1, 1)",
+                UUID.randomUUID().toString(), deTeste.getId());
+
+        var resultado = limpeza.limpar("E2E");
+
+        assertThat(resultado.motoristas()).isEqualTo(1);
+        assertThat(resultado.viagens()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from localizacao_viagem", Integer.class)).isZero();
+        assertThat(usuarioRepository.findById(motoristaTeste.getId())).isEmpty();
+        assertThat(usuarioRepository.findById(motoristaReal.getId())).isPresent();
+        assertThat(usuarioRepository.findById(passageiroComMarca.getId())).as("só motoristas de teste saem").isPresent();
     }
 }

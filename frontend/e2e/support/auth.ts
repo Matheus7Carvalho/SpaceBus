@@ -10,7 +10,8 @@ export const contas = {
 
 export const SENHA_DEMO = 'demo123'
 
-export type Conta = (typeof contas)[keyof typeof contas]
+/** Conta da seed ou criada pelo teste (ex.: motorista E2E). */
+export type Conta = { nome: string; email: string; perfil: string }
 
 export async function preencherLogin(page: Page, email: string, senha: string) {
   await page.getByLabel('E-mail').fill(email)

@@ -7,6 +7,7 @@ import { SimulatedBadge } from '@/components/shared/simulated-badge'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { LocalizacaoVan } from '@/features/localizacao/components/localizacao-van'
 import { HistoricoReserva } from '@/features/reservas/components/historico-reserva'
 import { ReservaAcoes } from '@/features/reservas/components/reserva-acoes'
 import { useReserva } from '@/features/reservas/hooks'
@@ -90,6 +91,7 @@ export function ReservaPage() {
         <p className="text-xs text-muted-foreground">{POLITICA.texto}</p>
         <HistoricoReserva eventos={r.historico} />
       </section>
+      <LocalizacaoVan reserva={r} />
     </>
   )
 }

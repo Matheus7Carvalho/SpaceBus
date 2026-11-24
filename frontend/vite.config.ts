@@ -10,6 +10,11 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  // Leaflet entra só por import dinâmico (mapa da localização). Sem pré-empacotar, o Vite descobre a dependência na
+  // primeira abertura do mapa e recarrega a página no meio do uso (e do teste E2E). Ver docs/testes-instaveis.md.
+  optimizeDeps: {
+    include: ['leaflet', 'react-leaflet'],
+  },
   // Portas configuráveis para conviver com outros serviços locais (ver .env.example).
   server: {
     port: Number(process.env.FRONTEND_PORT ?? 5173),

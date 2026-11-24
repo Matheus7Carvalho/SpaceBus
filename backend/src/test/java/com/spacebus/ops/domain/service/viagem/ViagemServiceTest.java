@@ -12,6 +12,7 @@ import com.spacebus.ops.domain.repository.rota.RotaRepository;
 import com.spacebus.ops.domain.repository.usuario.UsuarioRepository;
 import com.spacebus.ops.domain.repository.veiculo.VeiculoRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
+import com.spacebus.ops.domain.service.localizacao.LocalizacaoPropriedades;
 import com.spacebus.ops.domain.service.reserva.IReservaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,7 +68,7 @@ class ViagemServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ViagemService(repository, rotaRepository, veiculoRepository, usuarioRepository, reservas, CLOCK);
+        service = new ViagemService(repository, rotaRepository, veiculoRepository, usuarioRepository, reservas, CLOCK, LocalizacaoPropriedades.padrao());
         rota.setId("r1");
         van.setId("v1");
         motorista.setId("m1");

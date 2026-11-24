@@ -20,4 +20,8 @@
     <include file="db/changes/viagem/20261123-1-renova-seed-viagem.sql" context="dev"/>
     <include file="db/changes/reserva/20261124-1-tentativas-reembolso.sql"/>
     <include file="db/changes/auditoria/20261124-1-cria-auditoria-acesso.sql"/>
+    <include file="db/changes/viagem/20261124-1-inicio-e-encerramento.sql"/>
+    <include file="db/changes/localizacao/20261124-1-cria-localizacao-viagem.sql"/>
+    <include file="db/changes/auditoria/20261124-2-consulta-localizacao.sql"/>
+    <include file="db/changes/auditoria/20261124-3-consulta-localizacao-por-hora.sql"/>
 </databaseChangeLog>

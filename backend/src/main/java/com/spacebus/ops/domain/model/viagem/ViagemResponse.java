@@ -34,6 +34,10 @@ public class ViagemResponse {
     private StatusViagem status;
     /** Rotina de Rota Fixa que gerou a viagem; nulo se programada à mão. */
     private String rotinaId;
+    private LocalDateTime iniciadaEm;
+    private LocalDateTime encerradaEm;
+    /** Em andamento com localização desatualizada ou indisponível (só na agenda; nulo nas outras respostas). */
+    private Boolean semSinal;
     private LocalDateTime dataCriacao;
     private LocalDateTime dataAtualizacao;
 }

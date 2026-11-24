@@ -14,6 +14,9 @@ import { SEM_MOTORISTA, viagemSchema, type ViagemForm as Valores } from '../sche
 import type { Viagem } from '../types'
 import { ViagemAcoes } from './viagem-acoes'
 
+/** Cancelada, em andamento ou encerrada: os dados da viagem não mudam mais. */
+const SOMENTE_LEITURA: readonly Viagem['status'][] = ['CANCELADA', 'EM_ANDAMENTO', 'ENCERRADA']
+
 type ViagemFormProps = {
   /** Viagem gravada (edição); ausente no cadastro novo. */
   viagem?: Viagem
@@ -57,8 +60,10 @@ export function ViagemForm({ viagem, defaultValues, ...acoes }: ViagemFormProps)
   const carregando = (pendente: boolean) => (pendente ? 'Carregando…' : 'Selecione')
 
   return (
-    <CadastroForm form={form} rotulo="Viagem" className="max-w-4xl" somenteLeitura={viagem?.status === 'CANCELADA'} {...acoes}>
-      {viagem && <ViagemAcoes viagem={viagem} pendente={isDirty} />}
+    <CadastroForm form={form} rotulo="Viagem" className="max-w-4xl" somenteLeitura={!!viagem && SOMENTE_LEITURA.includes(viagem.status)}
+      topo={viagem && <ViagemAcoes viagem={viagem} pendente={isDirty} />}
+      {...acoes}
+    >
 
       <div className="grid gap-4 md:grid-cols-2">
         <SelectField<Valores>

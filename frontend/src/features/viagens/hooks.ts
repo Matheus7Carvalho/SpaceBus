@@ -42,6 +42,8 @@ function useAoGravar() {
       queryClient.invalidateQueries({ queryKey: ['busca'] }),
       // Cancelar a viagem cancela as reservas: a lista de passageiros muda junto.
       queryClient.invalidateQueries({ queryKey: ['viagens', salva.id, 'reservas'] }),
+      // Iniciar e encerrar mudam o bloco Localização.
+      queryClient.invalidateQueries({ queryKey: ['viagens', salva.id, 'localizacao'] }),
     ])
   }
 }

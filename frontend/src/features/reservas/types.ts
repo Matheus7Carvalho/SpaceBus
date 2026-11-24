@@ -1,4 +1,5 @@
 import type { Tom } from '@/components/shared/status-badge'
+import type { StatusViagem } from '@/features/viagens/types'
 
 export type StatusReserva = 'AGUARDANDO_PAGAMENTO' | 'CONFIRMADA' | 'EXPIRADA' | 'CANCELADA'
 export type StatusPagamento = 'PENDENTE' | 'APROVADO' | 'RECUSADO' | 'REEMBOLSO_PENDENTE' | 'REEMBOLSADO'
@@ -87,6 +88,8 @@ export type Reserva = {
   motivoCancelamento: MotivoCancelamento | null
   viagemId: string
   rotaNome: string
+  /** Situação da viagem (em andamento: "Acompanhar"). */
+  situacaoViagem: StatusViagem
   partida: string
   embarqueNome: string
   embarqueReferencia: string | null

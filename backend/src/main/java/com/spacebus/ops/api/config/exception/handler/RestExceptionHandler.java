@@ -1,6 +1,7 @@
 package com.spacebus.ops.api.config.exception.handler;
 
 import com.spacebus.ops.api.config.exception.ResponseError;
+import com.spacebus.ops.domain.core.exception.AcessoNegadoException;
 import com.spacebus.ops.domain.core.exception.DomainException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -48,8 +49,9 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
     // Anotá-los de novo causa "Ambiguous @ExceptionHandler" no Spring 6.
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        log.info(ERRO_NAO_ESPERADO, ex);
-        return new ResponseEntity<>(ResponseError.badRequest(ex.getMessage()), HttpStatus.BAD_REQUEST);
+        // O detalhe do Jackson (classes, posição no texto) vai só para o log; o cliente recebe uma mensagem curta.
+        log.info("Corpo da requisição inválido.", ex);
+        return new ResponseEntity<>(ResponseError.badRequest("Corpo da requisição inválido."), HttpStatus.BAD_REQUEST);
     }
 
     @Override
@@ -81,6 +83,12 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ResponseError> handleAccessDeniedException(AccessDeniedException ex) {
         return new ResponseEntity<>(ResponseError.of(HttpStatus.FORBIDDEN, "Acesso não permitido para o seu perfil."), HttpStatus.FORBIDDEN);
+    }
+
+    /** Perfil certo, registro de outro (ex.: motorista de outra viagem): 403 com o motivo. */
+    @ExceptionHandler(AcessoNegadoException.class)
+    public ResponseEntity<ResponseError> handleAcessoNegado(AcessoNegadoException ex) {
+        return new ResponseEntity<>(ResponseError.of(HttpStatus.FORBIDDEN, ex.getMessage()), HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(DomainException.class)

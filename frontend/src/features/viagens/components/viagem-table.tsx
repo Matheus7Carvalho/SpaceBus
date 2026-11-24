@@ -49,7 +49,10 @@ export function ViagemTable({ viagens, onExcluir }: ViagemTableProps) {
                 <TableCell className="hidden text-right tabular-nums sm:table-cell">{formatarPreco(v.preco)}</TableCell>
                 <TableCell className="hidden text-right tabular-nums sm:table-cell">{v.capacidade}</TableCell>
                 <TableCell>
-                  <StatusBadge tom={situacao.tom}>{situacao.rotulo}</StatusBadge>
+                  <div className="flex flex-wrap gap-1">
+                    <StatusBadge tom={situacao.tom}>{situacao.rotulo}</StatusBadge>
+                    {v.semSinal && <StatusBadge tom="atencao">Sem sinal</StatusBadge>}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">

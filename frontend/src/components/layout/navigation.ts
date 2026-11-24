@@ -1,4 +1,4 @@
-import { BusIcon, CalendarClockIcon, RouteIcon, SearchIcon, TicketIcon, type LucideIcon } from 'lucide-react'
+import { BusIcon, CalendarClockIcon, NavigationIcon, RouteIcon, SearchIcon, TicketIcon, type LucideIcon } from 'lucide-react'
 import { temPerfil } from '@/features/auth/permissoes'
 import type { Perfil } from '@/features/auth/types'
 
@@ -23,6 +23,11 @@ const OPERACAO = ['ADMINISTRADOR', 'OPERADOR'] as const satisfies readonly Perfi
  * Fluxo A: o passageiro busca e abre o detalhe da viagem.
  */
 export const navGrupos: readonly NavGrupo[] = [
+  {
+    // Primeiro: é a tela inicial do motorista (os outros perfis não veem o grupo).
+    titulo: 'Motorista',
+    itens: [{ title: 'Minhas viagens', to: '/motorista/viagens', icon: NavigationIcon, perfis: ['MOTORISTA'] }],
+  },
   {
     titulo: 'Operação',
     itens: [{ title: 'Viagens', to: '/operacao/viagens', icon: CalendarClockIcon, perfis: OPERACAO }],

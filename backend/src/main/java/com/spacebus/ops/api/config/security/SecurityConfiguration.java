@@ -53,6 +53,7 @@ public class SecurityConfiguration {
                         // Retorno do provedor de pagamento: sem sessão, autenticado pelo segredo no cabeçalho.
                         .requestMatchers(HttpMethod.POST, "/api/pagamento/webhook").permitAll()
                         .requestMatchers("/api/reserva", "/api/reserva/**").hasRole("PASSAGEIRO")
+                        .requestMatchers("/api/motorista", "/api/motorista/**").hasRole("MOTORISTA")
                         .requestMatchers("/api/veiculo", "/api/veiculo/**").hasAnyRole(OPERACAO)
                         .requestMatchers("/api/rota", "/api/rota/**").hasAnyRole(OPERACAO)
                         .requestMatchers("/api/viagem", "/api/viagem/**").hasAnyRole(OPERACAO)

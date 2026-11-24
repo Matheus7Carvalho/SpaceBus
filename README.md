@@ -18,7 +18,8 @@ MVP para passageiros encontrarem, acompanharem, reservarem e pagarem viagens de 
 | 1+ | Rota Única e Rota Fixa: a rota fixa tem rotina diária ou semanal que gera as viagens dos próximos 30 dias | Em teste |
 | 3 | [Reserva e pagamento](docs/modulo-03-reserva-pagamento.md): reserva com código, bloqueio de 10 min, pagamento simulado, minhas reservas, cancelamento com reembolso, passageiros por viagem | Em teste |
 | 4 | [Localização da viagem](docs/modulo-04-localizacao.md): motorista inicia e encerra a viagem e o celular transmite a posição; passageiro e operação acompanham no mapa, com aviso de dado desatualizado | Em desenvolvimento |
-| 5–6 | Notificações, indicadores | A fazer ([docs/escopo-mvp.md](docs/escopo-mvp.md)) |
+| 5 | [Notificações](docs/modulo-05-notificacoes.md): avisos ao passageiro na aplicação (sino e tela Notificações) para confirmação, horário alterado, viagem cancelada, van saiu e lembrete 1 h antes; e-mail e WhatsApp (com opt-in) simulados | Em desenvolvimento |
+| 6 | Indicadores | A fazer ([docs/escopo-mvp.md](docs/escopo-mvp.md)) |
 
 ## Requisitos
 
@@ -68,7 +69,7 @@ Criadas pela seed do Liquibase (contexto `dev`). A tela de login tem atalhos par
 | Administrador | `admin@spacebus.local` | `demo123` | Viagens, Rotas, Veículos, Buscar viagens |
 | Operador | `operador@spacebus.local` | `demo123` | Viagens, Rotas, Veículos, Buscar viagens |
 | Motorista | `motorista@spacebus.local` | `demo123` | Minhas viagens, Buscar viagens |
-| Passageiro | `passageiro@spacebus.local` | `demo123` | Buscar viagens, Minhas reservas |
+| Passageiro | `passageiro@spacebus.local` | `demo123` | Buscar viagens, Minhas reservas, Notificações |
 
 Há também um segundo motorista, `caio.nunes@spacebus.local`. A seed traz a rota "Centro – Aeroporto" (4 pontos), três veículos (um inativo) e quatro viagens (publicadas, rascunho e cancelada), com partidas a partir do dia seguinte. Em dev, a cada subida do backend as viagens da seed que ficaram no passado voltam para os próximos dias.
 
@@ -81,6 +82,10 @@ Há também um segundo motorista, `caio.nunes@spacebus.local`. A seed traz a rot
 - **Simulação (só dev, Administrador):** `POST /api/dev/localizacao/{viagemId}` com `{"latitude":-10.18,"longitude":-48.33,"precisaoM":20,"registradaEm":"2026-11-24T10:00:00-03:00"}` grava uma posição marcada como "Simulado" numa viagem em andamento.
 
 Limites (`spacebus.localizacao.*`, mesmos valores em `frontend/src/features/localizacao/limites.ts`): janela de início 30 min antes / 2 h depois; envio a cada 15 s; desatualizada após 2 min; lacuna acima de 60 s; encerramento automático 6 h após o início; coordenadas apagadas 24 h após o encerramento.
+
+### Notificações (módulo 5)
+
+O passageiro recebe os avisos na aplicação: sino no cabeçalho (não lidas) e tela **Notificações** (`/notificacoes`), com link para a reserva. Cada aviso também gera um envio por **e-mail** e, se o passageiro ligar "Receber por WhatsApp", por **WhatsApp**. Os dois são **simulados** (só registram "Enviado"/"Falhou"; nada sai de verdade). Lembrete: 1 h antes da partida (`SPACEBUS_NOTIFICACAO_LEMBRETE_MINUTOS`). Falhas de envio ficam no log e no item do passageiro; `SPACEBUS_NOTIFICACAO_SIMULAR_FALHA=true` faz todo envio falhar (testes).
 
 O pagamento é **simulado** (Pix de teste): na tela do provedor, o passageiro escolhe "Aprovar pagamento" ou "Recusar pagamento". Nenhuma cobrança real é feita.
 

@@ -352,7 +352,9 @@ class ReservaServiceTest {
         service.processarRetorno("sim_1", Resultado.APROVADO);
 
         assertThat(r.getStatus()).isEqualTo(StatusReserva.CONFIRMADA);
-        verify(eventos, never()).publishEvent(any(Object.class));
+        // Nenhum reembolso; só o pedido de notificação, que sai depois do commit.
+        verify(eventos).publishEvent(com.spacebus.ops.domain.service.notificacao.NotificacaoSolicitada.confirmada("rs1"));
+        verify(eventos, never()).publishEvent(any(ReembolsoSolicitado.class));
     }
 
     @Test
@@ -446,6 +448,7 @@ class ReservaServiceTest {
 
         assertThat(r.getStatus()).isEqualTo(StatusReserva.CANCELADA);
         assertThat(r.getMotivoCancelamento()).isEqualTo(MotivoCancelamento.VIAGEM_CANCELADA);
+        verify(eventos).publishEvent(com.spacebus.ops.domain.service.notificacao.NotificacaoSolicitada.cancelada("rs1", false));
         var status = ArgumentCaptor.forClass(java.util.Collection.class);
         verify(reservaRepository).idsDaViagemComStatus(eq("vg1"), status.capture());
         assertThat(status.getValue()).containsExactlyInAnyOrder(StatusReserva.AGUARDANDO_PAGAMENTO, StatusReserva.CONFIRMADA);

@@ -59,6 +59,13 @@ public interface ReservaRepository extends BaseRepository<Reserva> {
     @Query("select r.viagem.id from Reserva r where r.id = :id and r.passageiro.id = :passageiroId")
     Optional<String> viagemDaReservaDoPassageiro(String id, String passageiroId);
 
+    /** Reservas na situação informada, de viagens na situação informada, com partida em (agora, limite]. */
+    @Query("""
+            select r from Reserva r join fetch r.viagem v
+            where r.status = :status and v.status = :statusViagem and v.partida > :agora and v.partida <= :limite""")
+    List<Reserva> confirmadasComPartidaEntre(LocalDateTime agora, LocalDateTime limite, StatusReserva status,
+                                             com.spacebus.ops.domain.entity.enums.StatusViagem statusViagem);
+
     /** Lê a reserva já com a linha travada. Chamar depois de travar a viagem. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Reserva r where r.id = :id")

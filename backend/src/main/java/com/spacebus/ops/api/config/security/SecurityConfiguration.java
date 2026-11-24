@@ -54,6 +54,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/pagamento/webhook").permitAll()
                         .requestMatchers("/api/reserva", "/api/reserva/**").hasRole("PASSAGEIRO")
                         .requestMatchers("/api/motorista", "/api/motorista/**").hasRole("MOTORISTA")
+                        .requestMatchers("/api/notificacao", "/api/notificacao/**").hasRole("PASSAGEIRO")
                         .requestMatchers("/api/veiculo", "/api/veiculo/**").hasAnyRole(OPERACAO)
                         .requestMatchers("/api/rota", "/api/rota/**").hasAnyRole(OPERACAO)
                         .requestMatchers("/api/viagem", "/api/viagem/**").hasAnyRole(OPERACAO)

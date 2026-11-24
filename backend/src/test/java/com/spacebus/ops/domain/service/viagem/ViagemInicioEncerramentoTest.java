@@ -60,6 +60,7 @@ class ViagemInicioEncerramentoTest {
     @Mock private VeiculoRepository veiculoRepository;
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private IReservaService reservas;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventos;
 
     private ViagemService service;
     private final Rota rota = new Rota("Centro – Aeroporto", "Centro", "Aeroporto", List.of());
@@ -69,7 +70,7 @@ class ViagemInicioEncerramentoTest {
     @BeforeEach
     void setUp() {
         service = new ViagemService(repository, rotaRepository, veiculoRepository, usuarioRepository, reservas, CLOCK,
-                LocalizacaoPropriedades.padrao());
+                LocalizacaoPropriedades.padrao(), eventos);
         van.setId("v1");
         joao.setId("m1");
         lenient().when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -98,6 +99,7 @@ class ViagemInicioEncerramentoTest {
         assertThat(iniciada.getIniciadaPor()).isEqualTo("m1");
         verify(repository).travar("vg1");
         verify(repository).saveAndFlush(iniciada);
+        verify(eventos).publishEvent(com.spacebus.ops.domain.service.notificacao.NotificacaoSolicitada.iniciada("vg1"));
     }
 
     @Test
@@ -143,6 +145,7 @@ class ViagemInicioEncerramentoTest {
         viagem(EM_ANDAMENTO, AGORA.plusMinutes(10));
 
         assertThatThrownBy(() -> service.iniciar("vg1", "m1", "m1")).hasMessage("A viagem já está em andamento.");
+        verifyNoInteractions(eventos);
     }
 
     @Test

@@ -36,11 +36,19 @@ public class MotoristaTesteService {
 
     @Transactional
     public MotoristaTeste criar(String marca) {
+        return criar(marca, Perfil.MOTORISTA);
+    }
+
+    /** Motorista ou passageiro só deste teste (o passageiro, para as notificações não se misturarem entre testes). */
+    @Transactional
+    public MotoristaTeste criar(String marca, Perfil perfil) {
         if (!LimpezaDadosTesteService.marcaValida(marca)) throw new DomainException("Informe uma marca de teste (ex.: E2E).");
+        if (perfil != Perfil.MOTORISTA && perfil != Perfil.PASSAGEIRO) throw new DomainException("Só motorista ou passageiro de teste.");
         var sufixo = UUID.randomUUID().toString().substring(0, 8);
-        var nome = marca + " Motorista " + sufixo.toUpperCase(Locale.ROOT);
-        var email = marca.toLowerCase(Locale.ROOT) + "-motorista-" + sufixo + "@teste.local";
-        var salvo = usuarios.save(new Usuario(nome, email, passwordEncoder.encode(SENHA), Perfil.MOTORISTA, true));
+        var papel = perfil == Perfil.MOTORISTA ? "Motorista" : "Passageiro";
+        var nome = marca + " " + papel + " " + sufixo.toUpperCase(Locale.ROOT);
+        var email = marca.toLowerCase(Locale.ROOT) + "-" + papel.toLowerCase(Locale.ROOT) + "-" + sufixo + "@teste.local";
+        var salvo = usuarios.save(new Usuario(nome, email, passwordEncoder.encode(SENHA), perfil, true));
         return new MotoristaTeste(salvo.getId(), nome, email);
     }
 }

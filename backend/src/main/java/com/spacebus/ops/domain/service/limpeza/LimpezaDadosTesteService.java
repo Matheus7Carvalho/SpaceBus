@@ -29,7 +29,9 @@ public class LimpezaDadosTesteService {
               join veiculo ve on ve.id = v.veiculo_id
             where r.nome like :prefixo or ve.descricao like :prefixo""";
     private static final String RESERVAS_ALVO = "select id from reserva where viagem_id in (" + VIAGENS_ALVO + ")";
-    private static final String MOTORISTAS_ALVO = "select id from usuario where perfil = 'MOTORISTA' and nome like :prefixo";
+    private static final String MOTORISTAS_ALVO = "select id from usuario where perfil in ('MOTORISTA', 'PASSAGEIRO') and nome like :prefixo";
+    private static final String NOTIFICACOES_ALVO = "select id from notificacao where reserva_id in (" + RESERVAS_ALVO + ")"
+            + " or usuario_id in (" + MOTORISTAS_ALVO + ")";
 
     public record Resultado(int viagens, int rotas, int veiculos, int motoristas) {
     }
@@ -50,6 +52,8 @@ public class LimpezaDadosTesteService {
             throw new DomainException("Informe uma marca de teste (ex.: E2E).");
         }
         var p = new MapSqlParameterSource().addValue("prefixo", marca + "%");
+        jdbc.update("delete from notificacao_envio where notificacao_id in (" + NOTIFICACOES_ALVO + ")", p);
+        jdbc.update("delete from notificacao where id in (" + NOTIFICACOES_ALVO + ")", p);
         jdbc.update("delete from reserva_historico where reserva_id in (" + RESERVAS_ALVO + ")", p);
         jdbc.update("delete from pagamento where reserva_id in (" + RESERVAS_ALVO + ")", p);
         jdbc.update("delete from reserva where viagem_id in (" + VIAGENS_ALVO + ")", p);

@@ -11,6 +11,8 @@ import com.spacebus.ops.domain.repository.usuario.UsuarioRepository;
 import com.spacebus.ops.domain.repository.veiculo.VeiculoRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
 import com.spacebus.ops.domain.service.localizacao.LocalizacaoPropriedades;
+import com.spacebus.ops.domain.service.notificacao.NotificacaoSolicitada;
+import org.springframework.context.ApplicationEventPublisher;
 import com.spacebus.ops.domain.service.reserva.IReservaService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -45,10 +47,12 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
     private final IReservaService reservas;
     private final Clock clock;
     private final LocalizacaoPropriedades localizacao;
+    private final ApplicationEventPublisher eventos;
 
     protected ViagemService(final ViagemRepository repository, final RotaRepository rotaRepository,
                             final VeiculoRepository veiculoRepository, final UsuarioRepository usuarioRepository,
-                            final IReservaService reservas, final Clock clock, final LocalizacaoPropriedades localizacao) {
+                            final IReservaService reservas, final Clock clock, final LocalizacaoPropriedades localizacao,
+                            final ApplicationEventPublisher eventos) {
         super(repository);
         this.rotaRepository = rotaRepository;
         this.veiculoRepository = veiculoRepository;
@@ -56,6 +60,7 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
         this.reservas = reservas;
         this.clock = clock;
         this.localizacao = localizacao;
+        this.eventos = eventos;
     }
 
     @Override
@@ -77,6 +82,7 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
         }
         resolverReferencias(alterada);
         validarReservas(existente, alterada);
+        var partidaAnterior = existente.getPartida();
         existente.setRota(alterada.getRota());
         existente.setVeiculo(alterada.getVeiculo());
         existente.setMotorista(alterada.getMotorista());
@@ -84,7 +90,10 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
         existente.setPreco(alterada.getPreco());
         existente.setCapacidade(alterada.getCapacidade());
         validate(existente);
-        return getRepository().save(existente);
+        var salva = getRepository().save(existente);
+        // Só a partida avisa o passageiro (preço, veículo e motorista não).
+        if (!partidaAnterior.equals(salva.getPartida())) eventos.publishEvent(NotificacaoSolicitada.alterada(id, partidaAnterior));
+        return salva;
     }
 
     @Override
@@ -150,7 +159,9 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
         viagem.setStatus(EM_ANDAMENTO);
         viagem.setIniciadaEm(LocalDateTime.now(clock));
         viagem.setIniciadaPor(responsavelId);
-        return gravarInicio(viagem);
+        var iniciada = gravarInicio(viagem);
+        eventos.publishEvent(NotificacaoSolicitada.iniciada(id));
+        return iniciada;
     }
 
     @Override

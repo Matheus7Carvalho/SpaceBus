@@ -23,6 +23,7 @@ import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
 import com.spacebus.ops.domain.service.pagamento.ClienteProvedorPagamento;
 import com.spacebus.ops.domain.service.pagamento.ProvedorPagamento;
 import com.spacebus.ops.domain.service.pagamento.ProvedorPagamentoException;
+import com.spacebus.ops.domain.service.notificacao.NotificacaoSolicitada;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -239,6 +240,7 @@ public class ReservaService implements IReservaService {
             reserva.setStatus(StatusReserva.CONFIRMADA);
             reserva.setConfirmadaEm(agora);
             registrar(reserva, AcaoReserva.CONFIRMADA, OrigemAcao.PROVEDOR, null, null);
+            eventos.publishEvent(NotificacaoSolicitada.confirmada(reserva.getId()));
             return;
         }
         if (reserva.getStatus() == StatusReserva.AGUARDANDO_PAGAMENTO) {
@@ -279,7 +281,10 @@ public class ReservaService implements IReservaService {
         reservaRepository.idsDaViagemComStatus(viagemId, ATIVAS).stream()
                 .map(id -> reservaRepository.travar(id).orElseThrow())
                 .filter(r -> ATIVAS.contains(r.getStatus()))
-                .forEach(r -> encerrar(r, MotivoCancelamento.VIAGEM_CANCELADA, OrigemAcao.OPERADOR, responsavelId));
+                .forEach(r -> {
+                    var reembolso = encerrar(r, MotivoCancelamento.VIAGEM_CANCELADA, OrigemAcao.OPERADOR, responsavelId);
+                    eventos.publishEvent(NotificacaoSolicitada.cancelada(r.getId(), reembolso));
+                });
     }
 
     @Override
@@ -343,15 +348,19 @@ public class ReservaService implements IReservaService {
         return vencidas.size();
     }
 
-    /** Cancela a reserva e reembolsa o que já foi aprovado. Uma cobrança pendente que aprovar depois também é reembolsada. */
-    private void encerrar(Reserva reserva, MotivoCancelamento motivo, OrigemAcao origem, String responsavelId) {
+    /**
+     * Cancela a reserva e reembolsa o que já foi aprovado (retorna se havia). Uma cobrança pendente que aprovar depois
+     * também é reembolsada.
+     */
+    private boolean encerrar(Reserva reserva, MotivoCancelamento motivo, OrigemAcao origem, String responsavelId) {
         reserva.setStatus(StatusReserva.CANCELADA);
         reserva.setMotivoCancelamento(motivo);
         reserva.setCanceladaEm(agora());
         registrar(reserva, AcaoReserva.CANCELADA, origem, responsavelId,
                 motivo == MotivoCancelamento.VIAGEM_CANCELADA ? "Viagem cancelada pela transportadora." : null);
-        pagamentoRepository.findByReservaIdAndStatus(reserva.getId(), StatusPagamento.APROVADO)
-                .forEach(p -> reembolsar(p, origem, responsavelId));
+        var aprovados = pagamentoRepository.findByReservaIdAndStatus(reserva.getId(), StatusPagamento.APROVADO);
+        aprovados.forEach(p -> reembolsar(p, origem, responsavelId));
+        return !aprovados.isEmpty();
     }
 
     /**

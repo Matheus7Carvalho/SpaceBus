@@ -12,6 +12,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -36,4 +38,12 @@ public class Usuario extends BaseEntity {
 
     @Column(name = "ATIVO", nullable = false)
     private Boolean ativo;
+
+    /** Opt-in do WhatsApp (passageiro); nulo = sem consentimento. */
+    @Column(name = "WHATSAPP_CONSENTIDO_EM", columnDefinition = "TIMESTAMP")
+    private LocalDateTime whatsappConsentidoEm;
+
+    public Usuario(String nome, String email, String senha, Perfil perfil, Boolean ativo) {
+        this(nome, email, senha, perfil, ativo, null);
+    }
 }

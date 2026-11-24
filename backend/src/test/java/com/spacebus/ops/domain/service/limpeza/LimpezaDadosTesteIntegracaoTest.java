@@ -72,6 +72,8 @@ class LimpezaDadosTesteIntegracaoTest {
     @BeforeEach
     void setUp() {
         limpeza = new LimpezaDadosTesteService(namedJdbc);
+        jdbc.update("delete from notificacao_envio");
+        jdbc.update("delete from notificacao");
         jdbc.update("delete from reserva_historico");
         jdbc.update("delete from pagamento");
         jdbc.update("delete from reserva");
@@ -163,6 +165,7 @@ class LimpezaDadosTesteIntegracaoTest {
         var motoristaTeste = usuarioRepository.save(new Usuario("E2E Motorista AB12", "e2e-" + UUID.randomUUID() + "@teste", "h", Perfil.MOTORISTA, true));
         var motoristaReal = usuarioRepository.save(new Usuario("João Costa", "j-" + UUID.randomUUID() + "@teste", "h", Perfil.MOTORISTA, true));
         var passageiroComMarca = usuarioRepository.save(new Usuario("E2E Passageira", "pe2e-" + UUID.randomUUID() + "@teste", "h", Perfil.PASSAGEIRO, true));
+        var operadorComMarca = usuarioRepository.save(new Usuario("E2E Operadora", "oe2e-" + UUID.randomUUID() + "@teste", "h", Perfil.OPERADOR, true));
         var vanTeste = veiculo("E2E Van " + placa);
         var deTeste = viagemRepository.save(new Viagem(rota("Linha"), vanTeste, motoristaTeste, LocalDateTime.now().plusMinutes(10),
                 new BigDecimal("15.00"), 10, StatusViagem.EM_ANDAMENTO));
@@ -172,11 +175,12 @@ class LimpezaDadosTesteIntegracaoTest {
 
         var resultado = limpeza.limpar("E2E");
 
-        assertThat(resultado.motoristas()).isEqualTo(1);
+        assertThat(resultado.motoristas()).isEqualTo(2); // motorista e passageiro de teste
         assertThat(resultado.viagens()).isEqualTo(1);
         assertThat(jdbc.queryForObject("select count(*) from localizacao_viagem", Integer.class)).isZero();
         assertThat(usuarioRepository.findById(motoristaTeste.getId())).isEmpty();
         assertThat(usuarioRepository.findById(motoristaReal.getId())).isPresent();
-        assertThat(usuarioRepository.findById(passageiroComMarca.getId())).as("só motoristas de teste saem").isPresent();
+        assertThat(usuarioRepository.findById(passageiroComMarca.getId())).as("passageiro de teste (módulo 5) também sai").isEmpty();
+        assertThat(usuarioRepository.findById(operadorComMarca.getId())).as("só motoristas e passageiros de teste saem").isPresent();
     }
 }

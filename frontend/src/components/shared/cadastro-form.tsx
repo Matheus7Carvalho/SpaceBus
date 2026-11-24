@@ -21,6 +21,8 @@ type CadastroFormProps<T extends FieldValues> = {
   somenteLeitura?: boolean
   /** Ação principal além de Salvar, na barra fixa (FormActions). */
   acaoExtra?: ReactNode
+  /** Topo do formulário, fora do bloqueio de somente leitura (ex.: ações de situação de uma viagem em andamento). */
+  topo?: ReactNode
   children: ReactNode
 }
 
@@ -41,6 +43,7 @@ export function CadastroForm<T extends FieldValues>({
   className,
   somenteLeitura,
   acaoExtra,
+  topo,
   children,
 }: CadastroFormProps<T>) {
   const [salvos, setSalvos] = useState<T>()
@@ -68,6 +71,7 @@ export function CadastroForm<T extends FieldValues>({
             <AlertDescription>{erro}</AlertDescription>
           </Alert>
         )}
+        {topo}
         {/* display:contents mantém o layout em grade; disabled bloqueia todos os campos de uma vez. */}
         <fieldset disabled={somenteLeitura} className="contents">
           {children}

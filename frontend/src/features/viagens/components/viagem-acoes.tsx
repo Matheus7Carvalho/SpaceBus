@@ -3,7 +3,9 @@ import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { Button } from '@/components/ui/button'
+import { LOCALIZACAO } from '@/features/localizacao/limites'
 import { mensagemDeErro } from '@/lib/cadastro'
+import { useAgora } from '@/lib/use-agora'
 import { useTransicaoViagem } from '../hooks'
 import { situacaoInfo, type AcaoViagem, type Viagem } from '../types'
 
@@ -20,11 +22,24 @@ const CANCELAR: Acao = {
   destrutiva: true,
 }
 
+const INICIAR: Acao = { acao: 'iniciar', rotulo: 'Iniciar', titulo: 'Iniciar viagem?', aviso: 'Os passageiros passam a ver a localização enviada pelo celular do motorista.', sucesso: 'Viagem iniciada.' }
+const ENCERRAR: Acao = { acao: 'encerrar', rotulo: 'Encerrar', titulo: 'Encerrar viagem?', aviso: 'A localização deixa de ser exibida. Não é possível desfazer.', sucesso: 'Viagem encerrada.', destrutiva: true }
+
 const ACOES: Record<Viagem['status'], Acao[]> = {
   RASCUNHO: [PUBLICAR, CANCELAR],
-  PUBLICADA: [SUSPENDER, CANCELAR],
+  PUBLICADA: [INICIAR, SUSPENDER, CANCELAR],
   SUSPENSA: [PUBLICAR, CANCELAR],
   CANCELADA: [],
+  EM_ANDAMENTO: [ENCERRAR],
+  ENCERRADA: [],
+}
+
+const MINUTO = 60_000
+
+/** Mesma janela do servidor (inclusiva): de 30 min antes da partida até 2 h depois. */
+function naJanelaDeInicio(partida: string, agora: Date) {
+  const inicio = new Date(partida).getTime()
+  return agora.getTime() >= inicio - LOCALIZACAO.inicioAntesMin * MINUTO && agora.getTime() <= inicio + LOCALIZACAO.inicioDepoisMin * MINUTO
 }
 
 type ViagemAcoesProps = {
@@ -38,6 +53,8 @@ export function ViagemAcoes({ viagem, pendente }: ViagemAcoesProps) {
   const transicao = useTransicaoViagem(viagem.id)
   const [confirmando, setConfirmando] = useState<Acao | null>(null)
   const situacao = situacaoInfo[viagem.status]
+  const agora = useAgora(30_000)
+  const acoes = ACOES[viagem.status].filter((a) => a.acao !== 'iniciar' || naJanelaDeInicio(viagem.partida, agora))
 
   const executar = (acao: Acao) =>
     transicao.mutate(acao.acao, {
@@ -50,7 +67,7 @@ export function ViagemAcoes({ viagem, pendente }: ViagemAcoesProps) {
       <span className="text-sm text-muted-foreground">Situação</span>
       <StatusBadge tom={situacao.tom}>{situacao.rotulo}</StatusBadge>
       <div className="flex flex-wrap gap-2 sm:ml-2">
-        {ACOES[viagem.status].map((a) => (
+        {acoes.map((a) => (
           <Button
             key={a.acao}
             type="button"
@@ -65,7 +82,7 @@ export function ViagemAcoes({ viagem, pendente }: ViagemAcoesProps) {
           </Button>
         ))}
       </div>
-      {pendente && ACOES[viagem.status].length > 0 && <span className="text-xs text-muted-foreground">Salve as alterações antes.</span>}
+      {pendente && acoes.length > 0 && <span className="text-xs text-muted-foreground">Salve as alterações antes.</span>}
       <ConfirmDialog
         open={!!confirmando}
         onOpenChange={(open) => !open && setConfirmando(null)}

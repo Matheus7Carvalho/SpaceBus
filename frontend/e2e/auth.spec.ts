@@ -101,14 +101,19 @@ test.describe('Permissões por perfil', () => {
     }
   })
 
-  for (const conta of [contas.motorista, contas.passageiro]) {
-    test(`${conta.perfil} entra na busca, não vê a operação no menu e é bloqueado pela URL`, async ({ page, isMobile }) => {
+  // O motorista entra em Minhas viagens (módulo 4); o passageiro, na busca.
+  for (const [conta, inicio, titulo] of [
+    [contas.motorista, /\/motorista\/viagens$/, 'Minhas viagens'],
+    [contas.passageiro, /\/buscar$/, 'Buscar viagens'],
+  ] as const) {
+    test(`${conta.perfil} entra em ${titulo}, não vê a operação no menu e é bloqueado pela URL`, async ({ page, isMobile }) => {
       await entrar(page, conta)
 
-      await expect(page).toHaveURL(/\/buscar$/)
-      await expect(page.getByRole('heading', { level: 1, name: 'Buscar viagens' })).toBeVisible()
+      await expect(page).toHaveURL(inicio)
+      await expect(page.getByRole('heading', { level: 1, name: titulo })).toBeVisible()
       const menu = await navegacao(page, isMobile)
       await expect(menu.getByRole('link', { name: 'Buscar viagens' })).toBeVisible()
+      await expect(menu.getByRole('link', { name: 'Minhas viagens' })).toHaveCount(conta === contas.motorista ? 1 : 0)
       for (const restrito of ['Viagens', 'Rotas', 'Veículos']) {
         await expect(menu.getByRole('link', { name: restrito, exact: true })).toHaveCount(0)
       }

@@ -7,6 +7,7 @@ import { BuscaDetalhePage } from '@/pages/busca-detalhe-page'
 import { BuscaPage } from '@/pages/busca-page'
 import { HomeRedirect } from '@/pages/home-redirect'
 import { LoginPage } from '@/pages/login-page'
+import { MotoristaViagensPage } from '@/pages/motorista-viagens-page'
 import { NotFoundPage } from '@/pages/not-found-page'
 import { PagamentoSimuladoPage } from '@/pages/pagamento-simulado-page'
 import { ReservaPage } from '@/pages/reserva-page'
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <HomeRedirect /> },
+      { path: 'motorista/viagens', element: protegida('/motorista/viagens', <MotoristaViagensPage />) },
       cadastro('/operacao/viagens', <ViagensPage />, <ViagemFormPage />, 'nova'),
       cadastro('/cadastros/rotas', <RotasPage />, <RotaFormPage />, 'nova'),
       cadastro('/cadastros/veiculos', <VeiculosPage />, <VeiculoFormPage />),

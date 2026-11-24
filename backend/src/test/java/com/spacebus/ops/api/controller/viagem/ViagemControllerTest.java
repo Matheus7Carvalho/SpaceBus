@@ -14,6 +14,7 @@ import com.spacebus.ops.domain.entity.enums.StatusViagem;
 import com.spacebus.ops.domain.entity.enums.TipoVeiculo;
 import com.spacebus.ops.domain.model.viagem.IViagemMapperImpl;
 import com.spacebus.ops.domain.service.viagem.IViagemService;
+import com.spacebus.ops.domain.service.auditoria.IAuditoriaService;
 import com.spacebus.ops.domain.service.reserva.IReservaService;
 import com.spacebus.ops.api.controller.reserva.ReservaRespostas;
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,7 @@ class ViagemControllerTest {
     @Autowired private MockMvc mvc;
     @MockitoBean private IViagemService service;
     @MockitoBean private IReservaService reservas;
+    @MockitoBean private IAuditoriaService auditoria;
     @MockitoBean private UserDetailsService userDetailsService;
 
     private static Viagem viagem(StatusViagem status) {
@@ -153,7 +155,7 @@ class ViagemControllerTest {
     @ValueSource(strings = {"MOTORISTA", "PASSAGEIRO"})
     void listaDePassageirosSoParaAOperacao(String perfil) throws Exception {
         mvc.perform(get("/api/viagem/vg1/reservas").with(user("u").roles(perfil))).andExpect(status().isForbidden());
-        verifyNoInteractions(reservas);
+        verifyNoInteractions(reservas, auditoria);
     }
 
     @Test
@@ -162,6 +164,30 @@ class ViagemControllerTest {
 
         mvc.perform(get("/api/viagem/vg1/reservas").with(user(operador()))).andExpect(status().isOk()).andExpect(jsonPath("$").isArray());
         verify(reservas).daViagem("vg1");
+    }
+
+    /** QA R2: id inexistente ou longo demais responde 404 sem gravar auditoria nem expor erro de banco. */
+    @Test
+    void listaDePassageirosDeViagemInexistenteResponde404SemAuditoria() throws Exception {
+        var idLongo = "x".repeat(40);
+        when(service.findById(idLongo)).thenThrow(new jakarta.persistence.EntityNotFoundException("Item não encontrado."));
+
+        mvc.perform(get("/api/viagem/" + idLongo + "/reservas").with(user(operador()))).andExpect(status().isNotFound());
+
+        verifyNoInteractions(auditoria, reservas);
+    }
+
+    /** QA N7: o acesso à lista de passageiros é gravado (quem, perfil, viagem) antes de a lista sair. */
+    @Test
+    void acessoAListaDePassageirosEGravadoAntesDaLista() throws Exception {
+        when(reservas.daViagem("vg1")).thenReturn(List.of());
+
+        mvc.perform(get("/api/viagem/vg1/reservas").with(user(operador()))).andExpect(status().isOk());
+
+        var ordem = org.mockito.Mockito.inOrder(auditoria, reservas);
+        ordem.verify(auditoria).registrar("op1", com.spacebus.ops.domain.entity.enums.Perfil.OPERADOR,
+                com.spacebus.ops.domain.entity.enums.AcaoAuditada.CONSULTA_PASSAGEIROS_VIAGEM, "vg1");
+        ordem.verify(reservas).daViagem("vg1");
     }
 
     @Test

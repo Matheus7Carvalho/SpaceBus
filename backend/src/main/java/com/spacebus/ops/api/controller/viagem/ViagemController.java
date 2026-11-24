@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.spacebus.ops.api.controller.reserva.ReservaRespostas;
 import com.spacebus.ops.domain.entity.enums.StatusViagem;
 import com.spacebus.ops.domain.model.reserva.ReservaDaViagemResponse;
+import com.spacebus.ops.domain.entity.enums.AcaoAuditada;
+import com.spacebus.ops.domain.service.auditoria.IAuditoriaService;
 import com.spacebus.ops.domain.service.reserva.IReservaService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,8 +22,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.spacebus.ops.api.config.security.UsuarioAutenticado;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import java.time.LocalDate;
@@ -36,18 +36,18 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Viagem", description = "Partidas de uma rota: horário, veículo, preço, capacidade e situação.")
 public class ViagemController extends BaseController<Viagem, ViagemRequest, ViagemResponse> {
 
-    private static final Logger AUDITORIA = LoggerFactory.getLogger("auditoria");
-
     private final IViagemService service;
     private final IReservaService reservas;
     private final ReservaRespostas respostas;
+    private final IAuditoriaService auditoria;
 
     protected ViagemController(final IViagemMapper mapper, final IViagemService service, final IReservaService reservas,
-                               final ReservaRespostas respostas) {
+                               final ReservaRespostas respostas, final IAuditoriaService auditoria) {
         super(mapper, service);
         this.service = service;
         this.reservas = reservas;
         this.respostas = respostas;
+        this.auditoria = auditoria;
     }
 
     /** Ordem fixa por partida (o cliente não escolhe o campo) e no máximo 100 por página. */
@@ -67,7 +67,8 @@ public class ViagemController extends BaseController<Viagem, ViagemRequest, Viag
     @Operation(description = "Reservas e lista de passageiros da viagem, inclusive canceladas (a avisar).")
     public List<ReservaDaViagemResponse> reservas(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable String id) {
         // Lista com nome e e-mail de passageiros: todo acesso fica registrado (escopo, seção 3).
-        AUDITORIA.info("usuario={} perfil={} consultou passageiros da viagem={}", usuario.getId(), usuario.getPerfil(), id);
+        service.findById(id); // viagem inexistente (ou id inválido) responde 404 e não vira registro de auditoria
+        auditoria.registrar(usuario.getId(), usuario.getPerfil(), AcaoAuditada.CONSULTA_PASSAGEIROS_VIAGEM, id);
         return reservas.daViagem(id).stream().map(respostas::daViagem).toList();
     }
 

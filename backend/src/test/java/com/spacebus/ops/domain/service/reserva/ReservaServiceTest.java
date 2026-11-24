@@ -537,6 +537,31 @@ class ReservaServiceTest {
         assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSO_PENDENTE);
     }
 
+    /** Módulo 4: viagem iniciada (ainda antes da partida) não confirma aprovação que chega depois: expira e reembolsa. */
+    @Test
+    void aprovacaoDepoisDoInicioDaViagemNaoConfirmaEReembolsa() {
+        viagem.setStatus(StatusViagem.EM_ANDAMENTO);
+        viagem.setPartida(AGORA.plusMinutes(20));
+        var r = reserva(StatusReserva.AGUARDANDO_PAGAMENTO, AGORA.plusMinutes(5));
+        var p = pagamento(r, StatusPagamento.PENDENTE);
+
+        service.processarRetorno("sim_1", Resultado.APROVADO);
+
+        assertThat(r.getStatus()).isEqualTo(StatusReserva.EXPIRADA);
+        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSO_PENDENTE);
+        assertThat(historicoGravado()).filteredOn(h -> h.getAcao() == AcaoReserva.EXPIRADA)
+                .extracting(ReservaHistorico::getDetalhe).containsExactly("Pagamento aprovado depois do início da viagem.");
+    }
+
+    @Test
+    void naoReservaViagemEmAndamentoOuEncerrada() {
+        for (var status : List.of(StatusViagem.EM_ANDAMENTO, StatusViagem.ENCERRADA)) {
+            viagem.setStatus(status);
+            assertThatThrownBy(() -> service.reservar("u1", pedido(1, 4, 1))).hasMessage("Esta viagem não está mais disponível.");
+        }
+        verify(reservaRepository, never()).save(any());
+    }
+
     /** QA N6: reserva vencida (ainda não marcada) explica o motivo certo. */
     @Test
     void cancelarReservaVencidaExplicaOPrazoDePagamento() {

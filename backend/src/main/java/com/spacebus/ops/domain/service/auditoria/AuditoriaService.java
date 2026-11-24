@@ -10,6 +10,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 @Service
 public class AuditoriaService implements IAuditoriaService {
 
@@ -28,5 +31,12 @@ public class AuditoriaService implements IAuditoriaService {
     public void registrar(String usuarioId, Perfil perfil, AcaoAuditada acao, String recursoId) {
         repository.save(new AuditoriaAcesso(usuarioRepository.getReferenceById(usuarioId), perfil, acao, recursoId));
         LOG.info("usuario={} perfil={} acao={} recurso={}", usuarioId, perfil, acao, recursoId);
+    }
+
+    @Override
+    @Transactional
+    public void registrarUmaVezPorHora(String usuarioId, Perfil perfil, AcaoAuditada acao, String recursoId, LocalDateTime agora) {
+        var gravados = repository.inserirSeNovoNaHora(UUID.randomUUID().toString(), agora, usuarioId, perfil.name(), acao.name(), recursoId);
+        if (gravados > 0) LOG.info("usuario={} perfil={} acao={} recurso={}", usuarioId, perfil, acao, recursoId);
     }
 }

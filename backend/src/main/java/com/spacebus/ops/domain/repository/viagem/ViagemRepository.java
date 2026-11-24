@@ -84,6 +84,49 @@ public interface ViagemRepository extends BaseRepository<Viagem> {
               and (:status is null or cast(v.status as string) = :status)""")
     Page<Viagem> agenda(LocalDateTime inicio, LocalDateTime fim, String rotaId, String status, Pageable pageable);
 
+    /** Situação e motorista da viagem, para o envio de posições. */
+    interface SituacaoViagem {
+        String getStatus();
+
+        String getMotoristaId();
+    }
+
+    /**
+     * Trava a viagem em modo compartilhado (FOR SHARE): posições da mesma viagem não se bloqueiam, mas o encerramento
+     * (FOR UPDATE) espera as que estão em curso, e nenhuma posição é gravada depois dele.
+     */
+    @Query(value = "select v.status as status, v.motorista_id as motoristaId from viagem v where v.id = :id for share", nativeQuery = true)
+    Optional<SituacaoViagem> travarCompartilhado(String id);
+
+    /** Outra viagem em andamento do motorista (a garantia é o índice único uk_viagem_motorista_em_andamento). */
+    boolean existsByMotoristaIdAndStatusAndIdNot(String motoristaId, StatusViagem status, String id);
+
+    /** Outra viagem em andamento do veículo (a garantia é o índice único uk_viagem_veiculo_em_andamento). */
+    boolean existsByVeiculoIdAndStatusAndIdNot(String veiculoId, StatusViagem status, String id);
+
+    /**
+     * Viagens do motorista com partida no intervalo [inicio, fim), mais a que estiver em andamento (pode ter partido
+     * ontem). Rascunho não aparece: ainda não foi programado de fato.
+     */
+    @Query("""
+            select v from Viagem v
+              join fetch v.rota r left join fetch r.rotina join fetch v.veiculo left join fetch v.motorista
+            where v.motorista.id = :motoristaId and v.status <> :rascunho
+              and ((v.partida >= :inicio and v.partida < :fim) or v.status = :emAndamento)
+            order by v.partida""")
+    List<Viagem> doMotorista(String motoristaId, LocalDateTime inicio, LocalDateTime fim, StatusViagem rascunho, StatusViagem emAndamento);
+
+    /**
+     * Encerra as viagens iniciadas até {@code limite} e ainda em andamento. SKIP LOCKED: a que está sendo encerrada à mão
+     * agora fica de fora (e, ao commit dela, já não está em andamento).
+     */
+    @Modifying
+    @Query(value = """
+            update viagem set status = 'ENCERRADA', encerrada_em = :agora, encerrada_por = null, data_atualizacao = :agora
+            where id in (select id from viagem where status = 'EM_ANDAMENTO' and iniciada_em <= :limite for update skip locked)""",
+            nativeQuery = true)
+    int encerrarIniciadasAte(LocalDateTime limite, LocalDateTime agora);
+
     /** Há viagem futura não cancelada com este veículo. */
     @Query("""
             select count(v) > 0 from Viagem v

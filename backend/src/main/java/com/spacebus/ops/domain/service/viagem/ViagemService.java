@@ -1,5 +1,6 @@
 package com.spacebus.ops.domain.service.viagem;
 
+import com.spacebus.ops.domain.core.exception.AcessoNegadoException;
 import com.spacebus.ops.domain.core.exception.DomainException;
 import com.spacebus.ops.domain.core.service.BaseService;
 import com.spacebus.ops.domain.entity.Viagem;
@@ -9,8 +10,10 @@ import com.spacebus.ops.domain.repository.rota.RotaRepository;
 import com.spacebus.ops.domain.repository.usuario.UsuarioRepository;
 import com.spacebus.ops.domain.repository.veiculo.VeiculoRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
+import com.spacebus.ops.domain.service.localizacao.LocalizacaoPropriedades;
 import com.spacebus.ops.domain.service.reserva.IReservaService;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -20,9 +23,12 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.spacebus.ops.domain.entity.enums.StatusViagem.CANCELADA;
+import static com.spacebus.ops.domain.entity.enums.StatusViagem.EM_ANDAMENTO;
+import static com.spacebus.ops.domain.entity.enums.StatusViagem.ENCERRADA;
 import static com.spacebus.ops.domain.entity.enums.StatusViagem.PUBLICADA;
 import static com.spacebus.ops.domain.entity.enums.StatusViagem.RASCUNHO;
 import static com.spacebus.ops.domain.entity.enums.StatusViagem.SUSPENSA;
@@ -30,21 +36,26 @@ import static com.spacebus.ops.domain.entity.enums.StatusViagem.SUSPENSA;
 @Service
 public class ViagemService extends BaseService<Viagem> implements IViagemService {
 
+    private static final String OUTRA_DO_MOTORISTA = "Encerre a viagem em andamento antes de iniciar outra.";
+    private static final String OUTRA_DO_VEICULO = "O veículo já está em outra viagem em andamento.";
+
     private final RotaRepository rotaRepository;
     private final VeiculoRepository veiculoRepository;
     private final UsuarioRepository usuarioRepository;
     private final IReservaService reservas;
     private final Clock clock;
+    private final LocalizacaoPropriedades localizacao;
 
     protected ViagemService(final ViagemRepository repository, final RotaRepository rotaRepository,
                             final VeiculoRepository veiculoRepository, final UsuarioRepository usuarioRepository,
-                            final IReservaService reservas, final Clock clock) {
+                            final IReservaService reservas, final Clock clock, final LocalizacaoPropriedades localizacao) {
         super(repository);
         this.rotaRepository = rotaRepository;
         this.veiculoRepository = veiculoRepository;
         this.usuarioRepository = usuarioRepository;
         this.reservas = reservas;
         this.clock = clock;
+        this.localizacao = localizacao;
     }
 
     @Override
@@ -61,6 +72,9 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
     public Viagem update(Viagem alterada, String id) throws DomainException {
         var existente = travar(id);
         if (existente.getStatus() == CANCELADA) throw new DomainException("Viagem cancelada não pode ser alterada.");
+        if (existente.getStatus() == EM_ANDAMENTO || existente.getStatus() == ENCERRADA) {
+            throw new DomainException("Viagem em andamento ou encerrada não pode ser alterada.");
+        }
         resolverReferencias(alterada);
         validarReservas(existente, alterada);
         existente.setRota(alterada.getRota());
@@ -112,9 +126,84 @@ public class ViagemService extends BaseService<Viagem> implements IViagemService
     public Viagem cancelar(String id, String responsavelId) {
         var viagem = travar(id);
         if (viagem.getStatus() == CANCELADA) throw new DomainException("A viagem já está cancelada.");
+        if (viagem.getStatus() == EM_ANDAMENTO) throw new DomainException("Viagem em andamento não pode ser cancelada. Encerre a viagem.");
+        if (viagem.getStatus() == ENCERRADA) throw new DomainException("Viagem encerrada não pode ser cancelada.");
         var cancelada = mudarStatus(viagem, CANCELADA);
         reservas.cancelarPorViagem(id, responsavelId);
         return cancelada;
+    }
+
+    @Override
+    @Transactional
+    public Viagem iniciar(String id, String responsavelId, String motoristaId) {
+        var viagem = travar(id);
+        if (motoristaId != null && !conduzidaPor(viagem, motoristaId)) throw new AcessoNegadoException("Só o motorista da viagem pode iniciar.");
+        var impedimento = impedimentoParaIniciar(viagem);
+        if (impedimento.isPresent()) throw new DomainException(impedimento.get());
+        var motorista = viagem.getMotorista();
+        if (motorista != null && getRepository().existsByMotoristaIdAndStatusAndIdNot(motorista.getId(), EM_ANDAMENTO, id)) {
+            throw new DomainException(OUTRA_DO_MOTORISTA);
+        }
+        if (getRepository().existsByVeiculoIdAndStatusAndIdNot(viagem.getVeiculo().getId(), EM_ANDAMENTO, id)) {
+            throw new DomainException(OUTRA_DO_VEICULO);
+        }
+        viagem.setStatus(EM_ANDAMENTO);
+        viagem.setIniciadaEm(LocalDateTime.now(clock));
+        viagem.setIniciadaPor(responsavelId);
+        return gravarInicio(viagem);
+    }
+
+    @Override
+    @Transactional
+    public Viagem encerrar(String id, String responsavelId, String motoristaId) {
+        var viagem = travar(id);
+        if (motoristaId != null && !conduzidaPor(viagem, motoristaId)) throw new AcessoNegadoException("Só o motorista da viagem pode encerrar.");
+        exigirStatus(viagem, Set.of(EM_ANDAMENTO), "Só viagens em andamento podem ser encerradas.");
+        viagem.setStatus(ENCERRADA);
+        viagem.setEncerradaEm(LocalDateTime.now(clock));
+        viagem.setEncerradaPor(responsavelId);
+        return getRepository().save(viagem);
+    }
+
+    /** Janela de início inclusiva nos dois limites: de N min antes da partida até M min depois. */
+    @Override
+    public Optional<String> impedimentoParaIniciar(Viagem viagem) {
+        if (viagem.getStatus() == EM_ANDAMENTO) return Optional.of("A viagem já está em andamento.");
+        if (viagem.getStatus() != PUBLICADA) return Optional.of("Só viagens publicadas podem ser iniciadas.");
+        var agora = LocalDateTime.now(clock);
+        if (agora.isBefore(viagem.getPartida().minusMinutes(localizacao.inicioAntesMin()))) {
+            return Optional.of("A viagem pode ser iniciada a partir de %d minutos antes da partida.".formatted(localizacao.inicioAntesMin()));
+        }
+        if (agora.isAfter(viagem.getPartida().plusMinutes(localizacao.inicioDepoisMin()))) {
+            return Optional.of("O prazo para iniciar esta viagem acabou.");
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    @Transactional
+    public int encerrarEsquecidas() {
+        var agora = LocalDateTime.now(clock);
+        return getRepository().encerrarIniciadasAte(agora.minusHours(localizacao.encerramentoAutomaticoHoras()), agora);
+    }
+
+    /**
+     * Grava já (flush) para o índice único decidir dentro do método: dois inícios simultâneos do mesmo motorista (ou
+     * veículo) em viagens diferentes não se enxergam na conferência acima, e só um passa no banco.
+     */
+    private Viagem gravarInicio(Viagem viagem) {
+        try {
+            return getRepository().saveAndFlush(viagem);
+        } catch (DataIntegrityViolationException e) {
+            var causa = String.valueOf(e.getMostSpecificCause().getMessage());
+            if (causa.contains("uk_viagem_motorista_em_andamento")) throw new DomainException(OUTRA_DO_MOTORISTA);
+            if (causa.contains("uk_viagem_veiculo_em_andamento")) throw new DomainException(OUTRA_DO_VEICULO);
+            throw e;
+        }
+    }
+
+    private static boolean conduzidaPor(Viagem viagem, String motoristaId) {
+        return viagem.getMotorista() != null && viagem.getMotorista().getId().equals(motoristaId);
     }
 
     /** "Sem dia" vai até um horizonte longo em vez de deixar o fim aberto (parâmetro sempre tipado). */

@@ -14,6 +14,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,5 +40,18 @@ class AuditoriaServiceTest {
         assertThat(registro.getPerfil()).isEqualTo(Perfil.OPERADOR);
         assertThat(registro.getAcao()).isEqualTo(AcaoAuditada.CONSULTA_PASSAGEIROS_VIAGEM);
         assertThat(registro.getRecursoId()).isEqualTo("vg1");
+    }
+
+    /** A unicidade por hora fica no banco (insert ... on conflict do nothing); aqui, só o que é enviado. */
+    @Test
+    void consultaPorHoraUsaOInsertCondicionalSemSaveDaEntidade() {
+        var agora = java.time.LocalDateTime.of(2026, 11, 17, 8, 40);
+
+        service.registrarUmaVezPorHora("adm1", Perfil.ADMINISTRADOR, AcaoAuditada.CONSULTA_LOCALIZACAO_VIAGEM, "vg1", agora);
+
+        verify(repository).inserirSeNovoNaHora(any(), org.mockito.ArgumentMatchers.eq(agora), org.mockito.ArgumentMatchers.eq("adm1"),
+                org.mockito.ArgumentMatchers.eq("ADMINISTRADOR"), org.mockito.ArgumentMatchers.eq("CONSULTA_LOCALIZACAO_VIAGEM"),
+                org.mockito.ArgumentMatchers.eq("vg1"));
+        verify(repository, never()).save(any());
     }
 }

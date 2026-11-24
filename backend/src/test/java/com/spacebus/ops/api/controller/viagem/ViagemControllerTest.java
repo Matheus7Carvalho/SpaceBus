@@ -15,6 +15,7 @@ import com.spacebus.ops.domain.entity.enums.TipoVeiculo;
 import com.spacebus.ops.domain.model.viagem.IViagemMapperImpl;
 import com.spacebus.ops.domain.service.viagem.IViagemService;
 import com.spacebus.ops.domain.service.auditoria.IAuditoriaService;
+import com.spacebus.ops.domain.service.localizacao.ILocalizacaoService;
 import com.spacebus.ops.domain.service.reserva.IReservaService;
 import com.spacebus.ops.api.controller.reserva.ReservaRespostas;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,7 @@ class ViagemControllerTest {
     @MockitoBean private IViagemService service;
     @MockitoBean private IReservaService reservas;
     @MockitoBean private IAuditoriaService auditoria;
+    @MockitoBean private ILocalizacaoService localizacao;
     @MockitoBean private UserDetailsService userDetailsService;
 
     private static Viagem viagem(StatusViagem status) {
@@ -245,5 +247,71 @@ class ViagemControllerTest {
         mvc.perform(post("/api/viagem/vg1/publicar"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("A partida deve ser depois do horário atual."));
+    }
+
+    // --- Módulo 4: iniciar, encerrar e localização na operação ---
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MOTORISTA", "PASSAGEIRO"})
+    void iniciarEncerrarELocalizacaoSoParaAOperacao(String perfil) throws Exception {
+        mvc.perform(post("/api/viagem/vg1/iniciar").with(user("u").roles(perfil))).andExpect(status().isForbidden());
+        mvc.perform(post("/api/viagem/vg1/encerrar").with(user("u").roles(perfil))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/viagem/vg1/localizacao").with(user("u").roles(perfil))).andExpect(status().isForbidden());
+        verifyNoInteractions(service, localizacao);
+    }
+
+    @Test
+    void iniciarEncerrarELocalizacaoSemSessaoResponde401() throws Exception {
+        mvc.perform(post("/api/viagem/vg1/iniciar")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/viagem/vg1/localizacao")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(service, localizacao);
+    }
+
+    @Test
+    void operadorIniciaEEncerraSemConferirMotoristaComoResponsavel() throws Exception {
+        var iniciada = viagem(StatusViagem.EM_ANDAMENTO);
+        iniciada.setIniciadaEm(LocalDateTime.of(2026, 11, 18, 6, 40));
+        when(service.iniciar("vg1", "op1", null)).thenReturn(iniciada);
+        when(service.encerrar("vg1", "op1", null)).thenReturn(viagem(StatusViagem.ENCERRADA));
+
+        mvc.perform(post("/api/viagem/vg1/iniciar").with(user(operador())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EM_ANDAMENTO"))
+                .andExpect(jsonPath("$.iniciadaEm").value("2026-11-18T06:40:00"));
+        mvc.perform(post("/api/viagem/vg1/encerrar").with(user(operador())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ENCERRADA"));
+    }
+
+    @Test
+    void localizacaoDaOperacaoTemDiagnosticoESemDadosDoMotorista() throws Exception {
+        var resposta = com.spacebus.ops.domain.model.localizacao.LocalizacaoOperacaoResponse.builder()
+                .localizacao(com.spacebus.ops.domain.model.localizacao.LocalizacaoResponse.builder()
+                        .situacaoViagem(StatusViagem.EM_ANDAMENTO).disponivel(true).latitude(-10.18).longitude(-48.33).precisaoM(30.0)
+                        .registradaEm(LocalDateTime.of(2026, 11, 18, 7, 5)).segundosDesdeAtualizacao(20L).build())
+                .diagnostico(com.spacebus.ops.domain.model.localizacao.DiagnosticoLocalizacaoResponse.builder().aceitas(4).lacunas(1).build())
+                .build();
+        when(localizacao.daViagem("vg1", "op1", Perfil.OPERADOR)).thenReturn(resposta);
+
+        mvc.perform(get("/api/viagem/vg1/localizacao").with(user(operador())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.situacaoViagem").value("EM_ANDAMENTO"))
+                .andExpect(jsonPath("$.latitude").value(-10.18))
+                .andExpect(jsonPath("$.registradaEm").value("2026-11-18T07:05:00"))
+                .andExpect(jsonPath("$.desatualizada").value(false))
+                .andExpect(jsonPath("$.diagnostico.aceitas").value(4))
+                .andExpect(jsonPath("$.diagnostico.lacunas").value(1))
+                .andExpect(jsonPath("$.localizacao").doesNotExist())
+                .andExpect(jsonPath("$.motoristaNome").doesNotExist())
+                .andExpect(jsonPath("$.motoristaId").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(roles = "OPERADOR")
+    void agendaMarcaSemSinalSoNasViagensQueOServicoApontar() throws Exception {
+        var emAndamento = viagem(StatusViagem.EM_ANDAMENTO);
+        when(service.agenda(any(), any(), any(), any())).thenAnswer(inv -> new PageImpl<>(List.of(emAndamento), inv.getArgument(3), 1));
+        when(localizacao.semSinal(List.of(emAndamento))).thenReturn(java.util.Set.of("vg1"));
+
+        mvc.perform(get("/api/viagem/agenda")).andExpect(status().isOk()).andExpect(jsonPath("$.content[0].semSinal").value(true));
     }
 }

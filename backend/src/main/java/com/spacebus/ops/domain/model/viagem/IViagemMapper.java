@@ -19,6 +19,10 @@ public interface IViagemMapper extends IBaseMapper<Viagem, ViagemRequest, Viagem
     @Mapping(target = "motorista", source = "motoristaId", qualifiedByName = "motorista")
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "rotina", ignore = true)
+    @Mapping(target = "iniciadaEm", ignore = true)
+    @Mapping(target = "iniciadaPor", ignore = true)
+    @Mapping(target = "encerradaEm", ignore = true)
+    @Mapping(target = "encerradaPor", ignore = true)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "dataCriacao", ignore = true)
     @Mapping(target = "dataAtualizacao", ignore = true)
@@ -36,6 +40,7 @@ public interface IViagemMapper extends IBaseMapper<Viagem, ViagemRequest, Viagem
     @Mapping(target = "motoristaId", source = "motorista.id")
     @Mapping(target = "motoristaNome", source = "motorista.nome")
     @Mapping(target = "rotinaId", source = "rotina.id")
+    @Mapping(target = "semSinal", ignore = true)
     ViagemResponse toResponse(Viagem viagem);
 
     @Named("rota")

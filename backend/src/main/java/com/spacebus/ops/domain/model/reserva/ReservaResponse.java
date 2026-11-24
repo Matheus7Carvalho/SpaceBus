@@ -2,6 +2,7 @@ package com.spacebus.ops.domain.model.reserva;
 
 import com.spacebus.ops.domain.entity.enums.MotivoCancelamento;
 import com.spacebus.ops.domain.entity.enums.StatusReserva;
+import com.spacebus.ops.domain.entity.enums.StatusViagem;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,6 +26,8 @@ public class ReservaResponse {
     private MotivoCancelamento motivoCancelamento;
     private String viagemId;
     private String rotaNome;
+    /** Situação da viagem (ex.: em andamento: "Acompanhar"). */
+    private StatusViagem situacaoViagem;
     private LocalDateTime partida;
     private String embarqueNome;
     private String embarqueReferencia;

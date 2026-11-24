@@ -1,9 +1,11 @@
 package com.spacebus.ops.api.controller.reserva;
 
 import com.spacebus.ops.api.config.security.UsuarioAutenticado;
+import com.spacebus.ops.domain.model.localizacao.LocalizacaoResponse;
 import com.spacebus.ops.domain.model.reserva.PagamentoResponse;
 import com.spacebus.ops.domain.model.reserva.ReservaRequest;
 import com.spacebus.ops.domain.model.reserva.ReservaResponse;
+import com.spacebus.ops.domain.service.localizacao.ILocalizacaoService;
 import com.spacebus.ops.domain.service.reserva.IReservaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,10 +28,12 @@ public class ReservaController {
 
     private final IReservaService service;
     private final ReservaRespostas respostas;
+    private final ILocalizacaoService localizacao;
 
-    public ReservaController(IReservaService service, ReservaRespostas respostas) {
+    public ReservaController(IReservaService service, ReservaRespostas respostas, ILocalizacaoService localizacao) {
         this.service = service;
         this.respostas = respostas;
+        this.localizacao = localizacao;
     }
 
     @PostMapping
@@ -59,5 +63,11 @@ public class ReservaController {
     @Operation(description = "Cancela a reserva (até o prazo antes da partida); pagamento aprovado é reembolsado.")
     public ReservaResponse cancelar(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable String id) {
         return respostas.doPassageiro(service.cancelar(id, usuario.getId()));
+    }
+
+    @GetMapping("/{id}/localizacao")
+    @Operation(description = "Localização da van da reserva confirmada (posição só com a viagem em andamento).")
+    public LocalizacaoResponse localizacao(@AuthenticationPrincipal UsuarioAutenticado usuario, @PathVariable String id) {
+        return localizacao.daReserva(id, usuario.getId());
     }
 }

@@ -5,6 +5,7 @@ import com.spacebus.ops.api.config.security.SecurityConfiguration;
 import com.spacebus.ops.api.config.web.WebConfiguration;
 import com.spacebus.ops.domain.core.exception.DomainException;
 import com.spacebus.ops.domain.service.limpeza.LimpezaDadosTesteService;
+import com.spacebus.ops.domain.service.limpeza.MotoristaTesteService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -21,6 +22,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,6 +35,7 @@ class DadosTesteControllerTest {
 
     @Autowired private MockMvc mvc;
     @MockitoBean private LimpezaDadosTesteService service;
+    @MockitoBean private MotoristaTesteService motoristas;
     @MockitoBean private UserDetailsService userDetailsService;
 
     @Test
@@ -50,13 +53,14 @@ class DadosTesteControllerTest {
 
     @Test
     void administradorLimpaEVeOQueSaiu() throws Exception {
-        when(service.limpar("E2E")).thenReturn(new LimpezaDadosTesteService.Resultado(5, 2, 1));
+        when(service.limpar("E2E")).thenReturn(new LimpezaDadosTesteService.Resultado(5, 2, 1, 3));
 
         mvc.perform(delete(URL).with(user("u").roles("ADMINISTRADOR")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.viagens").value(5))
                 .andExpect(jsonPath("$.rotas").value(2))
-                .andExpect(jsonPath("$.veiculos").value(1));
+                .andExpect(jsonPath("$.veiculos").value(1))
+                .andExpect(jsonPath("$.motoristas").value(3));
     }
 
     @Test
@@ -66,5 +70,23 @@ class DadosTesteControllerTest {
         mvc.perform(delete("/api/dev/dados-teste?marca=Centro").with(user("u").roles("ADMINISTRADOR")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Informe uma marca de teste (ex.: E2E)."));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"OPERADOR", "MOTORISTA", "PASSAGEIRO"})
+    void soAdministradorCriaMotoristaDeTeste(String perfil) throws Exception {
+        mvc.perform(post("/api/dev/dados-teste/motorista?marca=E2E").with(user("u").roles(perfil))).andExpect(status().isForbidden());
+        verifyNoInteractions(motoristas);
+    }
+
+    @Test
+    void administradorCriaMotoristaDeTesteSemReceberSenha() throws Exception {
+        when(motoristas.criar("E2E")).thenReturn(new MotoristaTesteService.MotoristaTeste("m9", "E2E Motorista AB12", "e2e-motorista-ab12@teste.local"));
+
+        mvc.perform(post("/api/dev/dados-teste/motorista?marca=E2E").with(user("u").roles("ADMINISTRADOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("m9"))
+                .andExpect(jsonPath("$.email").value("e2e-motorista-ab12@teste.local"))
+                .andExpect(jsonPath("$.senha").doesNotExist());
     }
 }

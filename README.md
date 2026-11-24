@@ -99,3 +99,13 @@ Relatório em `frontend/playwright-report`. Para outra URL: `E2E_BASE_URL=http:/
 
 Antes dos testes, uma verificação aguarda até 60 s pelo frontend, pelo backend e pelo login da seed. Se o ambiente não estiver pronto, a suíte não roda e a mensagem indica a causa.
 
+
+## Verificação automática (CI)
+
+O GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) roda em todo PR para a `main` e em todo push na `main`, com três jobs em paralelo:
+
+- **Backend:** `./mvnw test`, inclusive os testes com PostgreSQL real.
+- **Frontend:** lint, tipos e build.
+- **E2E:** sobe a stack com `docker compose --profile app up --build` e roda o Playwright em desktop e mobile, no fuso da operação.
+
+Se algo falhar, os relatórios (surefire, Playwright e logs dos containers) ficam como artefatos da execução por 7 dias. Para bloquear o merge com teste falhando, a `main` deve exigir os três jobs em Settings → Branches.

@@ -9,6 +9,7 @@ import { HomeRedirect } from '@/pages/home-redirect'
 import { LoginPage } from '@/pages/login-page'
 import { MotoristaViagensPage } from '@/pages/motorista-viagens-page'
 import { NotFoundPage } from '@/pages/not-found-page'
+import { NotificacoesPage } from '@/pages/notificacoes-page'
 import { PagamentoSimuladoPage } from '@/pages/pagamento-simulado-page'
 import { ReservaPage } from '@/pages/reserva-page'
 import { ReservasPage } from '@/pages/reservas-page'
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <HomeRedirect /> },
+      { path: 'notificacoes', element: protegida('/notificacoes', <NotificacoesPage />) },
       { path: 'motorista/viagens', element: protegida('/motorista/viagens', <MotoristaViagensPage />) },
       cadastro('/operacao/viagens', <ViagensPage />, <ViagemFormPage />, 'nova'),
       cadastro('/cadastros/rotas', <RotasPage />, <RotaFormPage />, 'nova'),

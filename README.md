@@ -17,7 +17,8 @@ MVP para passageiros encontrarem, acompanharem, reservarem e pagarem viagens de 
 | 2 | [Consulta de viagens](docs/modulo-02-consulta-viagens.md): busca por origem, destino e data; detalhe com o percurso | Em teste |
 | 1+ | Rota Única e Rota Fixa: a rota fixa tem rotina diária ou semanal que gera as viagens dos próximos 30 dias | Em teste |
 | 3 | [Reserva e pagamento](docs/modulo-03-reserva-pagamento.md): reserva com código, bloqueio de 10 min, pagamento simulado, minhas reservas, cancelamento com reembolso, passageiros por viagem | Em teste |
-| 4–6 | Localização, notificações, indicadores | A fazer ([docs/escopo-mvp.md](docs/escopo-mvp.md)) |
+| 4 | [Localização da viagem](docs/modulo-04-localizacao.md): motorista inicia e encerra a viagem e o celular transmite a posição; passageiro e operação acompanham no mapa, com aviso de dado desatualizado | Em desenvolvimento |
+| 5–6 | Notificações, indicadores | A fazer ([docs/escopo-mvp.md](docs/escopo-mvp.md)) |
 
 ## Requisitos
 
@@ -66,10 +67,20 @@ Criadas pela seed do Liquibase (contexto `dev`). A tela de login tem atalhos par
 |---|---|---|---|
 | Administrador | `admin@spacebus.local` | `demo123` | Viagens, Rotas, Veículos, Buscar viagens |
 | Operador | `operador@spacebus.local` | `demo123` | Viagens, Rotas, Veículos, Buscar viagens |
-| Motorista | `motorista@spacebus.local` | `demo123` | Buscar viagens |
+| Motorista | `motorista@spacebus.local` | `demo123` | Minhas viagens, Buscar viagens |
 | Passageiro | `passageiro@spacebus.local` | `demo123` | Buscar viagens, Minhas reservas |
 
 Há também um segundo motorista, `caio.nunes@spacebus.local`. A seed traz a rota "Centro – Aeroporto" (4 pontos), três veículos (um inativo) e quatro viagens (publicadas, rascunho e cancelada), com partidas a partir do dia seguinte. Em dev, a cada subida do backend as viagens da seed que ficaram no passado voltam para os próximos dias.
+
+### Localização (módulo 4)
+
+- **Motorista:** a tela inicial é **Minhas viagens** (`/motorista/viagens`, feita para o celular): as viagens de hoje atribuídas a ele. **Iniciar** abre 30 min antes da partida e fecha 2 h depois; o navegador pede a permissão de localização e a tela mostra "Transmitindo" até **Encerrar**. A página precisa ficar aberta, com a tela ligada. A Geolocation API só funciona em contexto seguro: `localhost` em dev e **HTTPS** no piloto.
+- **Passageiro:** na reserva confirmada, o bloco "Localização da van" mostra o mapa com a última posição e a hora; em Minhas reservas, "Acompanhar".
+- **Operação:** na edição da viagem, Iniciar/Encerrar e o bloco Localização com o diagnóstico do sinal; na listagem, o selo "Sem sinal".
+- **Mapa:** Leaflet com tiles do OpenStreetMap (exige internet no navegador; os testes E2E bloqueiam os tiles).
+- **Simulação (só dev, Administrador):** `POST /api/dev/localizacao/{viagemId}` com `{"latitude":-10.18,"longitude":-48.33,"precisaoM":20,"registradaEm":"2026-11-24T10:00:00-03:00"}` grava uma posição marcada como "Simulado" numa viagem em andamento.
+
+Limites (`spacebus.localizacao.*`, mesmos valores em `frontend/src/features/localizacao/limites.ts`): janela de início 30 min antes / 2 h depois; envio a cada 15 s; desatualizada após 2 min; lacuna acima de 60 s; encerramento automático 6 h após o início; coordenadas apagadas 24 h após o encerramento.
 
 O pagamento é **simulado** (Pix de teste): na tela do provedor, o passageiro escolhe "Aprovar pagamento" ou "Recusar pagamento". Nenhuma cobrança real é feita.
 
@@ -79,7 +90,7 @@ O pagamento é **simulado** (Pix de teste): na tela do provedor, o passageiro es
 cd backend && ./mvnw test
 ```
 
-Os testes de concorrência de reserva (`ReservaConcorrenciaIntegracaoTest`) sobem um PostgreSQL real com Testcontainers; precisam do Docker no ar e são pulados sem ele.
+Os testes de concorrência de reserva e de localização (`ReservaConcorrenciaIntegracaoTest`, `LocalizacaoConcorrenciaIntegracaoTest`) sobem um PostgreSQL real com Testcontainers; precisam do Docker no ar e são pulados sem ele.
 
 ```bash
 cd frontend && npx tsc -b && npm run lint && npm run build

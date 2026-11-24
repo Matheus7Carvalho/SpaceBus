@@ -24,14 +24,14 @@ Rota ────┘        │                                               �
 | **Rotina** | Programação da Rota Fixa (diária ou semanal, horários, veículo, preço, capacidade, vigência) que gera as viagens dos próximos 30 dias; nunca gera duas vezes o mesmo horário | `Rotina`, `GeradorViagens`, `AgendadorRotinas` | Implementado |
 | **Ponto de parada** | Local de embarque/desembarque da rota, na ordem do percurso, com referência opcional | `PontoParada` (sempre dentro da rota) | Implementado |
 | **Viagem** | Uma partida da rota num horário, com veículo, motorista (opcional), preço e capacidade (lugares à venda) | `Viagem`, `/api/viagem`, tela `/operacao/viagens` | Implementado (cadastro do operador; busca e detalhe do passageiro em `/api/busca`, tela `/buscar`) |
-| **Situação da viagem** | `RASCUNHO → PUBLICADA ⇄ SUSPENSA`; qualquer uma → `CANCELADA` (definitivo). Só `PUBLICADA` aparece ao passageiro | `StatusViagem`, `POST /api/viagem/{id}/publicar`, `/suspender`, `/cancelar` | Implementado |
+| **Situação da viagem** | `RASCUNHO → PUBLICADA ⇄ SUSPENSA`; qualquer uma (exceto em andamento) → `CANCELADA` (definitivo). `PUBLICADA → EM_ANDAMENTO` (iniciar, de 30 min antes a 2 h depois da partida; encerra sozinha após 6 h) → `ENCERRADA` (definitivo). Só `PUBLICADA` aparece ao passageiro | `StatusViagem`, `POST /api/viagem/{id}/publicar`, `/suspender`, `/cancelar`, `/iniciar`, `/encerrar` | Implementado |
 | **Reserva** | Lugar(es) de um passageiro numa viagem, identificada por código; bloqueio temporário durante o pagamento. `AGUARDANDO_PAGAMENTO → CONFIRMADA`; `EXPIRADA`, `CANCELADA` | `Reserva`, `/api/reserva`, telas `/reservas` | Implementado |
 | **Vagas disponíveis** | Capacidade − reservas confirmadas e bloqueios vigentes. Nunca negativa; nunca dupla venda (conta feita com a viagem travada: `ViagemRepository.travar`) | `IReservaService.lugaresDisponiveis` | Implementado |
 | **Pagamento** | Cobrança no provedor externo (`ProvedorPagamento`; no piloto, `ProvedorPagamentoSimulado`); reserva confirmada só após o retorno do provedor (webhook idempotente) | `Pagamento`, `POST /api/pagamento/webhook` | Implementado (simulado) |
-| **Localização** | Última posição da viagem ativa enviada pelo celular do motorista, com hora da atualização | — | A implementar (módulo 4) |
+| **Localização** | Última posição da viagem em andamento enviada pelo celular do motorista (só a última, sem trajeto; apagada 24 h após o encerramento), com hora da atualização; desatualizada após 2 min | `LocalizacaoViagem`, `LocalizacaoService`, `/api/motorista/viagem`, `/api/reserva/{id}/localizacao`, telas `/motorista/viagens` e bloco na reserva e na viagem | Implementado |
 | **Notificação** | Mensagem transacional (confirmação, alteração, cancelamento, lembrete); falha de entrega não muda a reserva | — | A implementar (módulo 5) |
 
-Perfis (`Perfil`): `ADMINISTRADOR` (equipe Space Bus), `OPERADOR` (transportadora), `MOTORISTA`, `PASSAGEIRO`. Menu: **Operação** (Viagens), **Cadastros** (Rotas, Veículos), **Passageiro** (Buscar viagens, para todos os perfis; Minhas reservas, só Passageiro). **Trecho** é o par embarque → desembarque do passageiro dentro do percurso da rota. "Lugares" é o termo de tela para capacidade.
+Perfis (`Perfil`): `ADMINISTRADOR` (equipe Space Bus), `OPERADOR` (transportadora), `MOTORISTA`, `PASSAGEIRO`. Menu: **Motorista** (Minhas viagens, só Motorista), **Operação** (Viagens), **Cadastros** (Rotas, Veículos), **Passageiro** (Buscar viagens, para todos os perfis; Minhas reservas, só Passageiro). **Trecho** é o par embarque → desembarque do passageiro dentro do percurso da rota. "Lugares" é o termo de tela para capacidade.
 
 ## Decisões de arquitetura
 
@@ -333,7 +333,7 @@ Ordem dos módulos (detalhe em `docs/escopo-mvp.md`). Um módulo só começa dep
 1. **Cadastro operacional** (veículo, rota, viagem) — entregue para teste.
 2. **Consulta de viagens** pelo passageiro — entregue para teste. Endpoint próprio de leitura (`/api/busca`), só viagens `PUBLICADA` com partida futura; "lugares disponíveis" calculado num único ponto (`BuscaViagemService.lugaresDisponiveis`) que o módulo 3 completa com as reservas.
 3. **Reserva e pagamento** — entregue para teste. Premissas do piloto (quantidade de lugares, 10 min de bloqueio, pagamento simulado, cancelamento até 2 h antes) em `docs/modulo-03-reserva-pagamento.md`.
-4. **Localização** da viagem ativa (celular do motorista, hora da última atualização, dado desatualizado sinalizado).
+4. **Localização** da viagem ativa — entregue para teste. Premissas do piloto (janela de início, envio a cada 15 s, desatualizada após 2 min, retenção de 24 h, tela do celular ligada) em `docs/modulo-04-localizacao.md`.
 5. **Notificações** (aplicação + WhatsApp/e-mail com consentimento).
 6. **Indicadores básicos** (viagens, lugares vendidos, ocupação por horário).
 

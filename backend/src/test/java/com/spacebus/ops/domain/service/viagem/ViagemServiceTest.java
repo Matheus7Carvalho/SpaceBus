@@ -60,6 +60,7 @@ class ViagemServiceTest {
     @Mock private VeiculoRepository veiculoRepository;
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private IReservaService reservas;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventos;
 
     private ViagemService service;
     private final Rota rota = new Rota("Centro – Aeroporto", "Centro", "Aeroporto", List.of());
@@ -68,7 +69,7 @@ class ViagemServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ViagemService(repository, rotaRepository, veiculoRepository, usuarioRepository, reservas, CLOCK, LocalizacaoPropriedades.padrao());
+        service = new ViagemService(repository, rotaRepository, veiculoRepository, usuarioRepository, reservas, CLOCK, LocalizacaoPropriedades.padrao(), eventos);
         rota.setId("r1");
         van.setId("v1");
         motorista.setId("m1");
@@ -183,6 +184,17 @@ class ViagemServiceTest {
         assertThat(salva.getPartida()).isEqualTo(AMANHA_7H.plusHours(1));
         assertThat(salva.getMotorista()).isSameAs(motorista);
         verify(repository).existeConflitoVeiculo(eq("v1"), eq(AMANHA_7H.plusHours(1)), eq("vg1"), eq(CANCELADA));
+        verify(eventos).publishEvent(com.spacebus.ops.domain.service.notificacao.NotificacaoSolicitada.alterada("vg1", AMANHA_7H));
+    }
+
+    /** Módulo 5: editar sem mudar a partida (preço, capacidade) não avisa o passageiro. */
+    @Test
+    void edicaoSemMudarAPartidaNaoGeraNotificacao() {
+        existente(PUBLICADA);
+
+        service.update(pedido(null, AMANHA_7H, 10), "vg1");
+
+        verify(eventos, never()).publishEvent(any());
     }
 
     @Test

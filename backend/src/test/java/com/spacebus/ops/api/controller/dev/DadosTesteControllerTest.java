@@ -80,6 +80,17 @@ class DadosTesteControllerTest {
     }
 
     @Test
+    void administradorCriaPassageiroDeTeste() throws Exception {
+        when(motoristas.criar("E2E", com.spacebus.ops.domain.entity.enums.Perfil.PASSAGEIRO))
+                .thenReturn(new MotoristaTesteService.MotoristaTeste("p9", "E2E Passageiro AB12", "e2e-passageiro-ab12@teste.local"));
+
+        mvc.perform(post("/api/dev/dados-teste/passageiro?marca=E2E").with(user("u").roles("ADMINISTRADOR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("p9"));
+        mvc.perform(post("/api/dev/dados-teste/passageiro?marca=E2E").with(user("u").roles("OPERADOR"))).andExpect(status().isForbidden());
+    }
+
+    @Test
     void administradorCriaMotoristaDeTesteSemReceberSenha() throws Exception {
         when(motoristas.criar("E2E")).thenReturn(new MotoristaTesteService.MotoristaTeste("m9", "E2E Motorista AB12", "e2e-motorista-ab12@teste.local"));
 

@@ -24,4 +24,5 @@
     <include file="db/changes/localizacao/20261124-1-cria-localizacao-viagem.sql"/>
     <include file="db/changes/auditoria/20261124-2-consulta-localizacao.sql"/>
     <include file="db/changes/auditoria/20261124-3-consulta-localizacao-por-hora.sql"/>
+    <include file="db/changes/notificacao/20261125-1-cria-notificacao.sql"/>
 </databaseChangeLog>

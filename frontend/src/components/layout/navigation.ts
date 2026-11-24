@@ -1,4 +1,4 @@
-import { BusIcon, CalendarClockIcon, NavigationIcon, RouteIcon, SearchIcon, TicketIcon, type LucideIcon } from 'lucide-react'
+import { BellIcon, BusIcon, CalendarClockIcon, NavigationIcon, RouteIcon, SearchIcon, TicketIcon, type LucideIcon } from 'lucide-react'
 import { temPerfil } from '@/features/auth/permissoes'
 import type { Perfil } from '@/features/auth/types'
 
@@ -45,6 +45,7 @@ export const navGrupos: readonly NavGrupo[] = [
     itens: [
       { title: 'Buscar viagens', to: '/buscar', icon: SearchIcon },
       { title: 'Minhas reservas', to: '/reservas', icon: TicketIcon, perfis: ['PASSAGEIRO'] },
+      { title: 'Notificações', to: '/notificacoes', icon: BellIcon, perfis: ['PASSAGEIRO'] },
     ],
   },
 ]

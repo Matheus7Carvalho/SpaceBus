@@ -32,6 +32,12 @@ public class DadosTesteController {
         return service.limpar(marca);
     }
 
+    @PostMapping("/passageiro")
+    @Operation(description = "Cria um passageiro só para um teste (nome com a marca, senha das contas de demonstração).")
+    public MotoristaTesteService.MotoristaTeste criarPassageiro(@RequestParam String marca) {
+        return motoristas.criar(marca, com.spacebus.ops.domain.entity.enums.Perfil.PASSAGEIRO);
+    }
+
     @PostMapping("/motorista")
     @Operation(description = "Cria um motorista só para um teste (nome com a marca, senha das contas de demonstração).")
     public MotoristaTesteService.MotoristaTeste criarMotorista(@RequestParam String marca) {

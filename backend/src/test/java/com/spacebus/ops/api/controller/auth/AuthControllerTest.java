@@ -3,6 +3,7 @@ package com.spacebus.ops.api.controller.auth;
 import com.spacebus.ops.api.config.security.PasswordConfiguration;
 import com.spacebus.ops.api.config.security.SecurityConfiguration;
 import com.spacebus.ops.api.config.security.SessaoService;
+import com.spacebus.ops.api.config.tempo.TempoConfiguration;
 import com.spacebus.ops.api.config.security.UsuarioAutenticado;
 import com.spacebus.ops.domain.entity.Usuario;
 import com.spacebus.ops.domain.entity.enums.Perfil;
@@ -27,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfiguration.class, PasswordConfiguration.class, SessaoService.class})
+@Import({SecurityConfiguration.class, PasswordConfiguration.class, SessaoService.class, TempoConfiguration.class})
 class AuthControllerTest {
 
     private static final String EMAIL = "operador@spacebus.local";
@@ -59,12 +60,14 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nome").value("Ana Operadora"))
                 .andExpect(jsonPath("$.perfil").value("OPERADOR"))
+                .andExpect(jsonPath("$.fusoHorario").value(java.util.TimeZone.getDefault().getID()))
                 .andExpect(jsonPath("$.senha").doesNotExist())
                 .andReturn().getRequest().getSession();
 
         mvc.perform(get("/api/auth/sessao").session(session))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value(EMAIL));
+                .andExpect(jsonPath("$.email").value(EMAIL))
+                .andExpect(jsonPath("$.fusoHorario").value(java.util.TimeZone.getDefault().getID()));
     }
 
     @Test

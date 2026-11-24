@@ -157,3 +157,19 @@ test.describe('Detalhe da viagem', () => {
     await expect(page.getByRole('link', { name: 'Voltar à busca' })).toHaveAttribute('href', '/buscar')
   })
 })
+
+test.describe('Fuso do navegador diferente do da operação', () => {
+  // UTC+14: durante a maior parte do dia já é "amanhã" aqui, enquanto no fuso da operação ainda é "hoje".
+  test.use({ timezoneId: 'Pacific/Kiritimati' })
+
+  test('data mínima e data padrão seguem o fuso da operação, não o do navegador', async ({ page }) => {
+    const { fusoHorario } = (await (await page.request.get('/api/auth/sessao')).json()) as { fusoHorario: string }
+    const hojeNaOperacao = new Intl.DateTimeFormat('en-CA', { timeZone: fusoHorario }).format(new Date())
+
+    await page.goto('/buscar')
+
+    const data = page.getByRole('search', { name: 'Buscar viagens' }).getByLabel('Data')
+    await expect(data).toHaveAttribute('min', hojeNaOperacao)
+    await expect(data).toHaveValue(hojeNaOperacao)
+  })
+})

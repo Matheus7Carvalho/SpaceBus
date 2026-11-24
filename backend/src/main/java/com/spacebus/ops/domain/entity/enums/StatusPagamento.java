@@ -2,8 +2,8 @@ package com.spacebus.ops.domain.entity.enums;
 
 /**
  * PENDENTE → APROVADO ou RECUSADO (pelo provedor).
- * APROVADO → REEMBOLSADO (cancelamento ou aprovação sem lugar); se o provedor falhar no reembolso,
- * fica REEMBOLSO_PENDENTE até a nova tentativa automática conseguir.
+ * APROVADO → REEMBOLSO_PENDENTE (cancelamento ou aprovação sem lugar) → REEMBOLSADO quando o provedor confirma.
+ * O pedido ao provedor sai depois do commit; se falhar, a tarefa agendada tenta de novo, até o limite de tentativas.
  */
 public enum StatusPagamento {
     PENDENTE,

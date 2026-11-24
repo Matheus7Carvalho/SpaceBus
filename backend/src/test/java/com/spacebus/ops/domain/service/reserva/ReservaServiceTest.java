@@ -24,6 +24,7 @@ import com.spacebus.ops.domain.repository.reserva.ReservaHistoricoRepository;
 import com.spacebus.ops.domain.repository.reserva.ReservaRepository;
 import com.spacebus.ops.domain.repository.usuario.UsuarioRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
+import com.spacebus.ops.domain.service.pagamento.ClienteProvedorPagamento;
 import com.spacebus.ops.domain.service.pagamento.ProvedorPagamento;
 import com.spacebus.ops.domain.service.pagamento.ProvedorPagamentoException;
 import jakarta.persistence.EntityNotFoundException;
@@ -35,6 +36,8 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -51,7 +54,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -72,6 +74,8 @@ class ReservaServiceTest {
     @Mock private ViagemRepository viagemRepository;
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private ProvedorPagamento provedor;
+    @Mock private ApplicationEventPublisher eventos;
+    @Mock private PlatformTransactionManager transacoes;
 
     private ReservaService service;
     private Viagem viagem;
@@ -79,7 +83,8 @@ class ReservaServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ReservaService(reservaRepository, pagamentoRepository, historicoRepository, viagemRepository, usuarioRepository, provedor, CLOCK, 10, 2);
+        service = new ReservaService(reservaRepository, pagamentoRepository, historicoRepository, viagemRepository, usuarioRepository,
+                new ClienteProvedorPagamento(provedor, 1_000), eventos, transacoes, CLOCK, 10, 2);
         var pontos = new ArrayList<PontoParada>();
         for (int i = 1; i <= 4; i++) {
             var p = new PontoParada("Ponto " + i, i == 1 ? "Plataforma 3" : null);
@@ -120,6 +125,7 @@ class ReservaServiceTest {
 
     private Pagamento pagamento(Reserva r, StatusPagamento status) {
         var p = new Pagamento(r, "sim_1", "PIX_SIMULADO", r.getValorTotal(), status, "/reservas/pagamento/sim_1");
+        p.setId("pg1");
         lenient().when(pagamentoRepository.travarPorProvedorId("sim_1")).thenReturn(Optional.of(p));
         lenient().when(pagamentoRepository.viagemEReservaDaCobranca("sim_1")).thenReturn(List.<Object[]>of(new Object[]{"vg1", "rs1"}));
         return p;
@@ -206,7 +212,7 @@ class ReservaServiceTest {
     @Test
     void iniciaPagamentoCriandoCobrancaNoProvedor() {
         var r = reserva(StatusReserva.AGUARDANDO_PAGAMENTO, AGORA.plusMinutes(5));
-        when(provedor.criarCobranca("SB-ABC234", r.getValorTotal())).thenReturn(new ProvedorPagamento.Cobranca("sim_1", "/reservas/pagamento/sim_1"));
+        when(provedor.criarCobranca("rs1-0", "SB-ABC234", r.getValorTotal())).thenReturn(new ProvedorPagamento.Cobranca("sim_1", "/reservas/pagamento/sim_1"));
 
         var p = service.iniciarPagamento("rs1", "u1");
 
@@ -222,13 +228,13 @@ class ReservaServiceTest {
         when(pagamentoRepository.findFirstByReservaIdAndStatus("rs1", StatusPagamento.PENDENTE)).thenReturn(Optional.of(pendente));
 
         assertThat(service.iniciarPagamento("rs1", "u1")).isSameAs(pendente);
-        verify(provedor, never()).criarCobranca(anyString(), any());
+        verify(provedor, never()).criarCobranca(anyString(), anyString(), any());
     }
 
     @Test
     void falhaDoProvedorViraMensagemENaoMudaNada() {
         var r = reserva(StatusReserva.AGUARDANDO_PAGAMENTO, AGORA.plusMinutes(5));
-        when(provedor.criarCobranca(anyString(), any())).thenThrow(new ProvedorPagamentoException("timeout", null));
+        when(provedor.criarCobranca(anyString(), anyString(), any())).thenThrow(new ProvedorPagamentoException("timeout", null));
 
         assertThatThrownBy(() -> service.iniciarPagamento("rs1", "u1"))
                 .isInstanceOf(DomainException.class)
@@ -245,6 +251,58 @@ class ReservaServiceTest {
         reserva(StatusReserva.CONFIRMADA, AGORA.plusMinutes(5));
         assertThatThrownBy(() -> service.iniciarPagamento("rs1", "u1")).hasMessage("Esta reserva não está aguardando pagamento.");
         verifyNoInteractions(provedor);
+    }
+
+    /** QA N2: o provedor nunca é chamado com a trava segura; trava e gravação são duas transações curtas. */
+    @Test
+    void provedorEChamadoEntreDuasTransacoesCurtas() {
+        var r = reserva(StatusReserva.AGUARDANDO_PAGAMENTO, AGORA.plusMinutes(5));
+        when(provedor.criarCobranca(anyString(), anyString(), any())).thenReturn(new ProvedorPagamento.Cobranca("sim_1", "/x"));
+
+        service.iniciarPagamento("rs1", "u1");
+
+        var ordem = inOrder(transacoes, viagemRepository, provedor, pagamentoRepository);
+        ordem.verify(transacoes).getTransaction(any());
+        ordem.verify(viagemRepository).travar("vg1");
+        ordem.verify(transacoes).commit(any());
+        ordem.verify(provedor).criarCobranca("rs1-0", "SB-ABC234", r.getValorTotal());
+        ordem.verify(transacoes).getTransaction(any());
+        ordem.verify(viagemRepository).travar("vg1");
+        ordem.verify(pagamentoRepository).save(any());
+        ordem.verify(transacoes).commit(any());
+    }
+
+    @Test
+    void chaveDeIdempotenciaMudaDepoisDeUmaCobrancaRecusada() {
+        var r = reserva(StatusReserva.AGUARDANDO_PAGAMENTO, AGORA.plusMinutes(5));
+        when(pagamentoRepository.countByReservaId("rs1")).thenReturn(1L);
+        when(provedor.criarCobranca("rs1-1", "SB-ABC234", r.getValorTotal())).thenReturn(new ProvedorPagamento.Cobranca("sim_2", "/x"));
+
+        assertThat(service.iniciarPagamento("rs1", "u1").getProvedorId()).isEqualTo("sim_2");
+    }
+
+    /** Chamada simultânea com a mesma chave já gravou a cobrança: devolve a mesma, sem duplicar. */
+    @Test
+    void cobrancaJaGravadaPorChamadaSimultaneaEDevolvida() {
+        var r = reserva(StatusReserva.AGUARDANDO_PAGAMENTO, AGORA.plusMinutes(5));
+        var gravada = new Pagamento(r, "sim_1", "PIX_SIMULADO", r.getValorTotal(), StatusPagamento.PENDENTE, "/x");
+        when(provedor.criarCobranca(anyString(), anyString(), any())).thenReturn(new ProvedorPagamento.Cobranca("sim_1", "/x"));
+        when(pagamentoRepository.findByProvedorId("sim_1")).thenReturn(Optional.of(gravada));
+
+        assertThat(service.iniciarPagamento("rs1", "u1")).isSameAs(gravada);
+        verify(pagamentoRepository, never()).save(any());
+    }
+
+    @Test
+    void reservaQueVenceEnquantoOProvedorRespondeNaoGravaACobranca() {
+        var r = reserva(StatusReserva.AGUARDANDO_PAGAMENTO, AGORA.plusMinutes(5));
+        when(provedor.criarCobranca(anyString(), anyString(), any())).thenAnswer(inv -> {
+            r.setExpiraEm(AGORA);
+            return new ProvedorPagamento.Cobranca("sim_1", "/x");
+        });
+
+        assertThatThrownBy(() -> service.iniciarPagamento("rs1", "u1")).hasMessage("O prazo para pagar esta reserva acabou. Faça uma nova reserva.");
+        verify(pagamentoRepository, never()).save(any());
     }
 
     @Test
@@ -294,7 +352,7 @@ class ReservaServiceTest {
         service.processarRetorno("sim_1", Resultado.APROVADO);
 
         assertThat(r.getStatus()).isEqualTo(StatusReserva.CONFIRMADA);
-        verify(provedor, never()).reembolsar(anyString());
+        verify(eventos, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -306,8 +364,9 @@ class ReservaServiceTest {
         service.processarRetorno("sim_1", Resultado.APROVADO);
 
         assertThat(r.getStatus()).isEqualTo(StatusReserva.EXPIRADA);
-        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSADO);
-        verify(provedor).reembolsar("sim_1");
+        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSO_PENDENTE);
+        verify(eventos).publishEvent(new ReembolsoSolicitado("pg1", OrigemAcao.PROVEDOR, null));
+        verify(provedor, never()).reembolsar(anyString());
     }
 
     @Test
@@ -318,7 +377,8 @@ class ReservaServiceTest {
         service.processarRetorno("sim_1", Resultado.APROVADO);
 
         assertThat(r.getStatus()).isEqualTo(StatusReserva.CANCELADA);
-        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSADO);
+        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSO_PENDENTE);
+        verify(eventos).publishEvent(new ReembolsoSolicitado("pg1", OrigemAcao.PROVEDOR, null));
     }
 
     @Test
@@ -340,7 +400,8 @@ class ReservaServiceTest {
         assertThat(r.getStatus()).isEqualTo(StatusReserva.CANCELADA);
         assertThat(r.getMotivoCancelamento()).isEqualTo(MotivoCancelamento.PASSAGEIRO);
         assertThat(r.getCanceladaEm()).isEqualTo(AGORA);
-        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSADO);
+        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSO_PENDENTE);
+        verify(eventos).publishEvent(new ReembolsoSolicitado("pg1", OrigemAcao.PASSAGEIRO, "u1"));
     }
 
     @Test
@@ -362,57 +423,31 @@ class ReservaServiceTest {
         assertThatThrownBy(() -> service.cancelar("rs1", "u1")).hasMessage("Esta reserva não pode mais ser cancelada.");
     }
 
+    /** QA N2: o reembolso não é pedido com a trava segura; sai depois do commit (ProcessadorReembolsos). */
     @Test
-    void falhaNoReembolsoNaoDesfazOCancelamento() {
+    void cancelamentoPedeOReembolsoSoDepoisDoCommit() {
         var r = reserva(StatusReserva.CONFIRMADA, AGORA.minusMinutes(5));
         var p = pagamento(r, StatusPagamento.APROVADO);
         when(pagamentoRepository.findByReservaIdAndStatus("rs1", StatusPagamento.APROVADO)).thenReturn(List.of(p));
-        doThrow(new ProvedorPagamentoException("fora do ar", null)).when(provedor).reembolsar("sim_1");
 
         service.cancelar("rs1", "u1");
 
-        assertThat(r.getStatus()).isEqualTo(StatusReserva.CANCELADA);
+        verifyNoInteractions(provedor);
         assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSO_PENDENTE);
-        assertThat(acoesRegistradas()).containsSubsequence(AcaoReserva.CANCELADA, AcaoReserva.REEMBOLSO_PENDENTE);
-    }
-
-    @Test
-    void novaTentativaConcluiOReembolsoPendente() {
-        var r = reserva(StatusReserva.CANCELADA, AGORA.minusMinutes(5));
-        var p = pagamento(r, StatusPagamento.REEMBOLSO_PENDENTE);
-        when(pagamentoRepository.travarReembolsosPendentes()).thenReturn(List.of(p));
-
-        assertThat(service.tentarReembolsosPendentes()).isEqualTo(1);
-
-        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSADO);
-        assertThat(acoesRegistradas()).containsExactly(AcaoReserva.REEMBOLSADA);
-        assertThat(origensRegistradas()).containsExactly(OrigemAcao.SISTEMA);
-    }
-
-    @Test
-    void novaTentativaQueFalhaContinuaPendenteSemDuplicarHistorico() {
-        var r = reserva(StatusReserva.CANCELADA, AGORA.minusMinutes(5));
-        var p = pagamento(r, StatusPagamento.REEMBOLSO_PENDENTE);
-        when(pagamentoRepository.travarReembolsosPendentes()).thenReturn(List.of(p));
-        doThrow(new ProvedorPagamentoException("fora do ar", null)).when(provedor).reembolsar("sim_1");
-
-        assertThat(service.tentarReembolsosPendentes()).isZero();
-
-        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSO_PENDENTE);
-        verify(historicoRepository, never()).save(any());
+        assertThat(acoesRegistradas()).containsExactly(AcaoReserva.CANCELADA);
     }
 
     @Test
     void cancelarPorViagemMarcaParaAvisar() {
         var r = reserva(StatusReserva.AGUARDANDO_PAGAMENTO, AGORA.plusMinutes(5));
-        when(reservaRepository.findByViagemIdAndStatusIn(eq("vg1"), any())).thenReturn(List.of(r));
+        when(reservaRepository.idsDaViagemComStatus(eq("vg1"), any())).thenReturn(List.of("rs1"));
 
         service.cancelarPorViagem("vg1", "op1");
 
         assertThat(r.getStatus()).isEqualTo(StatusReserva.CANCELADA);
         assertThat(r.getMotivoCancelamento()).isEqualTo(MotivoCancelamento.VIAGEM_CANCELADA);
         var status = ArgumentCaptor.forClass(java.util.Collection.class);
-        verify(reservaRepository).findByViagemIdAndStatusIn(eq("vg1"), status.capture());
+        verify(reservaRepository).idsDaViagemComStatus(eq("vg1"), status.capture());
         assertThat(status.getValue()).containsExactlyInAnyOrder(StatusReserva.AGUARDANDO_PAGAMENTO, StatusReserva.CONFIRMADA);
     }
 
@@ -468,11 +503,11 @@ class ReservaServiceTest {
     @Test
     void iniciarPagamentoTravaAViagem() {
         var r = reserva(StatusReserva.AGUARDANDO_PAGAMENTO, AGORA.plusMinutes(5));
-        when(provedor.criarCobranca(anyString(), any())).thenReturn(new ProvedorPagamento.Cobranca("sim_1", "/x"));
+        when(provedor.criarCobranca(anyString(), anyString(), any())).thenReturn(new ProvedorPagamento.Cobranca("sim_1", "/x"));
 
         service.iniciarPagamento("rs1", "u1");
 
-        verify(viagemRepository).travar("vg1");
+        verify(viagemRepository, org.mockito.Mockito.times(2)).travar("vg1"); // antes e depois da chamada ao provedor
         assertThat(acoesRegistradas()).containsExactly(AcaoReserva.PAGAMENTO_INICIADO);
         assertThat(r.getStatus()).isEqualTo(StatusReserva.AGUARDANDO_PAGAMENTO);
     }
@@ -486,7 +521,7 @@ class ReservaServiceTest {
         service.processarRetorno("sim_1", Resultado.APROVADO);
 
         assertThat(r.getStatus()).isNotEqualTo(StatusReserva.CONFIRMADA);
-        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSADO);
+        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSO_PENDENTE);
     }
 
     /** QA N1: aprovação que chega depois da partida não confirma; o valor volta ao passageiro. */
@@ -499,7 +534,7 @@ class ReservaServiceTest {
         service.processarRetorno("sim_1", Resultado.APROVADO);
 
         assertThat(r.getStatus()).isEqualTo(StatusReserva.EXPIRADA);
-        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSADO);
+        assertThat(p.getStatus()).isEqualTo(StatusPagamento.REEMBOLSO_PENDENTE);
     }
 
     /** QA N6: reserva vencida (ainda não marcada) explica o motivo certo. */

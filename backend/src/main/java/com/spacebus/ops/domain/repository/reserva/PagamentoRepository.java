@@ -4,10 +4,8 @@ import com.spacebus.ops.domain.core.repository.BaseRepository;
 import com.spacebus.ops.domain.entity.Pagamento;
 import com.spacebus.ops.domain.entity.enums.StatusPagamento;
 import jakarta.persistence.LockModeType;
-import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -36,9 +34,18 @@ public interface PagamentoRepository extends BaseRepository<Pagamento> {
 
     List<Pagamento> findByReservaIdAndStatus(String reservaId, StatusPagamento status);
 
-    /** Reembolsos que o provedor ainda não concluiu, travados; os já em tratamento ficam para a próxima rodada. */
+    /** Trava só a cobrança (para o resultado de um reembolso, pedido fora de qualquer outra trava). */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
-    @Query("select p from Pagamento p where p.status = com.spacebus.ops.domain.entity.enums.StatusPagamento.REEMBOLSO_PENDENTE")
-    List<Pagamento> travarReembolsosPendentes();
+    @Query("select p from Pagamento p where p.id = :id")
+    Optional<Pagamento> travar(String id);
+
+    long countByReservaId(String reservaId);
+
+    /** Reembolsos ainda não concluídos que não esgotaram as tentativas, do mais antigo para o mais novo. */
+    @Query("""
+            select p.id from Pagamento p
+            where p.status = com.spacebus.ops.domain.entity.enums.StatusPagamento.REEMBOLSO_PENDENTE
+              and p.tentativasReembolso < :maxTentativas
+            order by p.dataCriacao""")
+    List<String> reembolsosPendentes(int maxTentativas);
 }

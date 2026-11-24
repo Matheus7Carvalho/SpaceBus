@@ -20,13 +20,18 @@ import com.spacebus.ops.domain.repository.reserva.ReservaHistoricoRepository;
 import com.spacebus.ops.domain.repository.reserva.ReservaRepository;
 import com.spacebus.ops.domain.repository.usuario.UsuarioRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
+import com.spacebus.ops.domain.service.pagamento.ClienteProvedorPagamento;
 import com.spacebus.ops.domain.service.pagamento.ProvedorPagamento;
 import com.spacebus.ops.domain.service.pagamento.ProvedorPagamentoException;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
@@ -53,7 +58,9 @@ public class ReservaService implements IReservaService {
     private final ReservaHistoricoRepository historicoRepository;
     private final ViagemRepository viagemRepository;
     private final UsuarioRepository usuarioRepository;
-    private final ProvedorPagamento provedor;
+    private final ClienteProvedorPagamento provedor;
+    private final ApplicationEventPublisher eventos;
+    private final TransactionTemplate transacao;
     private final Clock clock;
     private final int bloqueioMinutos;
     private final int cancelamentoHoras;
@@ -61,7 +68,8 @@ public class ReservaService implements IReservaService {
 
     public ReservaService(ReservaRepository reservaRepository, PagamentoRepository pagamentoRepository,
                           ReservaHistoricoRepository historicoRepository, ViagemRepository viagemRepository,
-                          UsuarioRepository usuarioRepository, ProvedorPagamento provedor, Clock clock,
+                          UsuarioRepository usuarioRepository, ClienteProvedorPagamento provedor,
+                          ApplicationEventPublisher eventos, PlatformTransactionManager transacoes, Clock clock,
                           @Value("${spacebus.reserva.bloqueio-minutos:10}") int bloqueioMinutos,
                           @Value("${spacebus.reserva.cancelamento-horas:2}") int cancelamentoHoras) {
         this.reservaRepository = reservaRepository;
@@ -70,6 +78,8 @@ public class ReservaService implements IReservaService {
         this.viagemRepository = viagemRepository;
         this.usuarioRepository = usuarioRepository;
         this.provedor = provedor;
+        this.eventos = eventos;
+        this.transacao = new TransactionTemplate(transacoes);
         this.clock = clock;
         this.bloqueioMinutos = bloqueioMinutos;
         this.cancelamentoHoras = cancelamentoHoras;
@@ -132,30 +142,59 @@ public class ReservaService implements IReservaService {
                 .orElseThrow(() -> new EntityNotFoundException(NAO_ENCONTRADA));
     }
 
-    /** Travada: duas chamadas ao mesmo tempo não criam duas cobranças no provedor. */
+    /**
+     * O provedor é chamado fora de qualquer trava, entre duas transações curtas: um provedor lento não segura a
+     * viagem. A chave de idempotência (reserva + nº de cobranças já feitas) faz duas chamadas simultâneas
+     * receberem a mesma cobrança, e a gravação confere de novo a reserva antes de aceitar.
+     */
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Pagamento iniciarPagamento(String reservaId, String passageiroId) {
+        var pedido = transacao.execute(s -> prepararCobranca(reservaId, passageiroId));
+        if (pedido.pendente() != null) return pedido.pendente();
+
+        ProvedorPagamento.Cobranca cobranca;
+        try {
+            cobranca = provedor.criarCobranca(pedido.chave(), pedido.codigo(), pedido.valor());
+        } catch (ProvedorPagamentoException e) {
+            log.warn("Falha ao criar cobrança da reserva {}.", pedido.codigo(), e);
+            throw new DomainException("Não foi possível iniciar o pagamento agora. Tente de novo em instantes.");
+        }
+        return transacao.execute(s -> gravarCobranca(reservaId, passageiroId, cobranca));
+    }
+
+    private record PedidoCobranca(Pagamento pendente, String chave, String codigo, BigDecimal valor) {
+    }
+
+    private PedidoCobranca prepararCobranca(String reservaId, String passageiroId) {
         var reserva = travarDoPassageiro(reservaId, passageiroId);
+        exigirPagavel(reserva);
+        var pendente = pagamentoRepository.findFirstByReservaIdAndStatus(reservaId, StatusPagamento.PENDENTE);
+        if (pendente.isPresent()) return new PedidoCobranca(pendente.get(), null, null, null);
+        var chave = reserva.getId() + "-" + pagamentoRepository.countByReservaId(reservaId);
+        return new PedidoCobranca(null, chave, reserva.getCodigo(), reserva.getValorTotal());
+    }
+
+    /** Se a reserva venceu ou foi cancelada enquanto o provedor respondia, a cobrança não é gravada nem mostrada. */
+    private Pagamento gravarCobranca(String reservaId, String passageiroId, ProvedorPagamento.Cobranca cobranca) {
+        var reserva = travarDoPassageiro(reservaId, passageiroId);
+        var mesma = pagamentoRepository.findByProvedorId(cobranca.provedorId());
+        if (mesma.isPresent()) return mesma.get();
+        var pendente = pagamentoRepository.findFirstByReservaIdAndStatus(reservaId, StatusPagamento.PENDENTE);
+        if (pendente.isPresent()) return pendente.get();
+        exigirPagavel(reserva);
+        var pagamento = pagamentoRepository.save(new Pagamento(reserva, cobranca.provedorId(), provedor.metodo(),
+                reserva.getValorTotal(), StatusPagamento.PENDENTE, cobranca.urlPagamento()));
+        registrar(reserva, AcaoReserva.PAGAMENTO_INICIADO, OrigemAcao.PASSAGEIRO, passageiroId, cobranca.provedorId());
+        return pagamento;
+    }
+
+    private void exigirPagavel(Reserva reserva) {
         if (!pagavel(reserva)) {
             throw new DomainException(reserva.getStatus() == StatusReserva.AGUARDANDO_PAGAMENTO
                     ? "O prazo para pagar esta reserva acabou. Faça uma nova reserva."
                     : "Esta reserva não está aguardando pagamento.");
         }
-        var pendente = pagamentoRepository.findFirstByReservaIdAndStatus(reservaId, StatusPagamento.PENDENTE);
-        if (pendente.isPresent()) return pendente.get();
-
-        ProvedorPagamento.Cobranca cobranca;
-        try {
-            cobranca = provedor.criarCobranca(reserva.getCodigo(), reserva.getValorTotal());
-        } catch (ProvedorPagamentoException e) {
-            log.warn("Falha ao criar cobrança da reserva {}.", reserva.getCodigo(), e);
-            throw new DomainException("Não foi possível iniciar o pagamento agora. Tente de novo em instantes.");
-        }
-        var pagamento = pagamentoRepository.save(new Pagamento(reserva, cobranca.provedorId(), provedor.metodo(),
-                reserva.getValorTotal(), StatusPagamento.PENDENTE, cobranca.urlPagamento()));
-        registrar(reserva, AcaoReserva.PAGAMENTO_INICIADO, OrigemAcao.PASSAGEIRO, passageiroId, cobranca.provedorId());
-        return pagamento;
     }
 
     /**
@@ -220,9 +259,10 @@ public class ReservaService implements IReservaService {
     @Override
     @Transactional
     public void cancelarPorViagem(String viagemId, String responsavelId) {
-        // Relê cada reserva travada: uma expiração em andamento (SKIP LOCKED) não é sobrescrita.
-        reservaRepository.findByViagemIdAndStatusIn(viagemId, ATIVAS).stream()
-                .map(r -> reservaRepository.travar(r.getId()).orElseThrow())
+        // Descobre os ids sem carregar as reservas e lê cada uma já travada: uma expiração em andamento
+        // (que segura a trava da reserva) termina antes, e a situação lida é a gravada por ela.
+        reservaRepository.idsDaViagemComStatus(viagemId, ATIVAS).stream()
+                .map(id -> reservaRepository.travar(id).orElseThrow())
                 .filter(r -> ATIVAS.contains(r.getStatus()))
                 .forEach(r -> encerrar(r, MotivoCancelamento.VIAGEM_CANCELADA, OrigemAcao.OPERADOR, responsavelId));
     }
@@ -275,16 +315,6 @@ public class ReservaService implements IReservaService {
         return vencidas.size();
     }
 
-    @Override
-    @Transactional
-    public int tentarReembolsosPendentes() {
-        var concluidos = 0;
-        for (var pagamento : pagamentoRepository.travarReembolsosPendentes()) {
-            if (reembolsar(pagamento, OrigemAcao.SISTEMA, null)) concluidos++;
-        }
-        return concluidos;
-    }
-
     /** Cancela a reserva e reembolsa o que já foi aprovado. Uma cobrança pendente que aprovar depois também é reembolsada. */
     private void encerrar(Reserva reserva, MotivoCancelamento motivo, OrigemAcao origem, String responsavelId) {
         reserva.setStatus(StatusReserva.CANCELADA);
@@ -297,24 +327,12 @@ public class ReservaService implements IReservaService {
     }
 
     /**
-     * Falha no provedor não desfaz o cancelamento: o pagamento fica REEMBOLSO_PENDENTE e a tarefa agendada
-     * tenta de novo. O reembolso é idempotente no provedor (mesma cobrança), então repetir não devolve em dobro.
+     * Marca o reembolso e o pede ao provedor só depois do commit ({@link ProcessadorReembolsos}), sem trava segura.
+     * Falha do provedor não desfaz nada: o pagamento fica REEMBOLSO_PENDENTE e a tarefa agendada tenta de novo.
      */
-    private boolean reembolsar(Pagamento pagamento, OrigemAcao origem, String responsavelId) {
-        var reserva = pagamento.getReserva();
-        try {
-            provedor.reembolsar(pagamento.getProvedorId());
-            pagamento.setStatus(StatusPagamento.REEMBOLSADO);
-            registrar(reserva, AcaoReserva.REEMBOLSADA, origem, responsavelId, pagamento.getProvedorId());
-            return true;
-        } catch (ProvedorPagamentoException e) {
-            log.error("Reembolso da cobrança {} falhou; fica pendente para nova tentativa.", pagamento.getProvedorId(), e);
-            if (pagamento.getStatus() != StatusPagamento.REEMBOLSO_PENDENTE) {
-                pagamento.setStatus(StatusPagamento.REEMBOLSO_PENDENTE);
-                registrar(reserva, AcaoReserva.REEMBOLSO_PENDENTE, origem, responsavelId, pagamento.getProvedorId());
-            }
-            return false;
-        }
+    private void reembolsar(Pagamento pagamento, OrigemAcao origem, String responsavelId) {
+        pagamento.setStatus(StatusPagamento.REEMBOLSO_PENDENTE);
+        eventos.publishEvent(new ReembolsoSolicitado(pagamento.getId(), origem, responsavelId));
     }
 
     /** Trava a viagem da reserva (descoberta sem carregar a reserva) e depois a própria reserva. */

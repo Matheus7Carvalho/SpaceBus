@@ -42,7 +42,9 @@ public interface ReservaRepository extends BaseRepository<Reserva> {
 
     List<Reserva> findByViagemIdOrderByDataCriacao(String viagemId);
 
-    List<Reserva> findByViagemIdAndStatusIn(String viagemId, Collection<StatusReserva> status);
+    /** Só os ids: a entidade é lida depois de travada ({@link #travar}), nunca antes (dado velho na sessão). */
+    @Query("select r.id from Reserva r where r.viagem.id = :viagemId and r.status in :status")
+    List<String> idsDaViagemComStatus(String viagemId, Collection<StatusReserva> status);
 
     /** Viagem de uma reserva do passageiro, sem carregar a reserva (para travar a viagem antes de lê-la). */
     @Query("select r.viagem.id from Reserva r where r.id = :id and r.passageiro.id = :passageiroId")

@@ -53,7 +53,4 @@ public interface IReservaService {
 
     /** Marca como expiradas as reservas sem pagamento vencidas. Retorna quantas. */
     int expirarVencidas();
-
-    /** Tenta de novo os reembolsos que o provedor não concluiu. Retorna quantos foram concluídos. */
-    int tentarReembolsosPendentes();
 }

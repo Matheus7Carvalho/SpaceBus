@@ -15,9 +15,11 @@ import org.springframework.stereotype.Component;
 public class AgendadorReservas {
 
     private final IReservaService service;
+    private final ProcessadorReembolsos reembolsos;
 
-    public AgendadorReservas(IReservaService service) {
+    public AgendadorReservas(IReservaService service, ProcessadorReembolsos reembolsos) {
         this.service = service;
+        this.reembolsos = reembolsos;
     }
 
     @Scheduled(fixedDelayString = "${spacebus.reserva.expiracao-ms:60000}")
@@ -26,10 +28,10 @@ public class AgendadorReservas {
         if (expiradas > 0) log.info("Reservas expiradas: {}.", expiradas);
     }
 
-    /** Reembolsos que o provedor não concluiu na hora são tentados de novo até dar certo. */
+    /** Reembolsos que o provedor não concluiu na hora são tentados de novo, até o limite de tentativas. */
     @Scheduled(fixedDelayString = "${spacebus.reserva.reembolso-ms:300000}")
     public void reembolsar() {
-        var concluidos = service.tentarReembolsosPendentes();
+        var concluidos = reembolsos.tentarPendentes();
         if (concluidos > 0) log.info("Reembolsos pendentes concluídos: {}.", concluidos);
     }
 }

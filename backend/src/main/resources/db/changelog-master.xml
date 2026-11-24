@@ -18,4 +18,5 @@
     <include file="db/changes/reserva/20261123-1-historico-e-reembolso-pendente.sql"/>
     <include file="db/changes/reserva/20261123-2-ordem-historico.sql"/>
     <include file="db/changes/viagem/20261123-1-renova-seed-viagem.sql" context="dev"/>
+    <include file="db/changes/reserva/20261124-1-tentativas-reembolso.sql"/>
 </databaseChangeLog>

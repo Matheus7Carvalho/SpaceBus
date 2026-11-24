@@ -23,6 +23,7 @@ import com.spacebus.ops.domain.repository.rota.RotaRepository;
 import com.spacebus.ops.domain.repository.usuario.UsuarioRepository;
 import com.spacebus.ops.domain.repository.veiculo.VeiculoRepository;
 import com.spacebus.ops.domain.repository.viagem.ViagemRepository;
+import com.spacebus.ops.domain.service.pagamento.ProvedorPagamento;
 import com.spacebus.ops.domain.service.viagem.IViagemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -45,11 +47,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 
 /**
  * Concorrência com PostgreSQL real (travas SELECT ... FOR UPDATE de verdade). Reproduz os cenários do QA:
  * duas reservas da última vaga; retorno do provedor enquanto o operador muda a capacidade ou cancela a viagem;
- * retorno do provedor enquanto o passageiro cancela. Sem Docker, a classe é pulada.
+ * retorno do provedor enquanto o passageiro cancela; expiração em lote junto do retorno e do cancelamento da viagem;
+ * provedor lento sem segurar a viagem (N2). Sem Docker, a classe é pulada.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
@@ -77,6 +83,7 @@ class ReservaConcorrenciaIntegracaoTest {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private TransactionTemplate transacao;
     @Autowired private JdbcTemplate jdbc;
+    @MockitoSpyBean private ProvedorPagamento provedor;
 
     private String passageiroId;
     private String operadorId;
@@ -225,6 +232,113 @@ class ReservaConcorrenciaIntegracaoTest {
 
         assertThat(reserva(reservaId).getStatus()).isEqualTo(StatusReserva.CANCELADA);
         assertThat(pagamentoRepository.findByProvedorId(pagamento.getProvedorId()).orElseThrow().getStatus()).isEqualTo(StatusPagamento.REEMBOLSADO);
+    }
+
+    /** Segura numa transação a expiração em lote (travas das reservas vencidas) enquanto {@code concorrente} roda. */
+    private void comExpiracaoSegurando(Runnable concorrente) throws Exception {
+        var travou = new CountDownLatch(1);
+        var liberar = new CountDownLatch(1);
+        var dono = CompletableFuture.runAsync(() -> transacao.executeWithoutResult(s -> {
+            assertThat(reservas.expirarVencidas()).isPositive();
+            travou.countDown();
+            aguardar(liberar);
+        }));
+        assertThat(travou.await(10, TimeUnit.SECONDS)).isTrue();
+        var outro = CompletableFuture.runAsync(concorrente);
+        esperarAlguemBloqueado();
+        liberar.countDown();
+        dono.get(10, TimeUnit.SECONDS);
+        outro.get(10, TimeUnit.SECONDS);
+    }
+
+    /** Lacuna do QA: aprovação chegando durante a expiração em lote espera, e confirma se ainda há lugar. */
+    @Test
+    void retornoDuranteExpiracaoEmLoteConfirmaSeAindaHouverLugar() throws Exception {
+        var pagamento = reservaComPagamentoPendente(2, true);
+        var reservaId = pagamentoRepository.findByProvedorId(pagamento.getProvedorId()).orElseThrow().getReserva().getId();
+
+        comExpiracaoSegurando(() -> reservas.processarRetorno(pagamento.getProvedorId(), Resultado.APROVADO));
+
+        assertThat(reserva(reservaId).getStatus()).isEqualTo(StatusReserva.CONFIRMADA);
+        assertThat(historicoRepository.findByReservaIdOrderByOrdemAsc(reservaId)).extracting(h -> h.getAcao())
+                .containsSubsequence(AcaoReserva.EXPIRADA, AcaoReserva.PAGAMENTO_APROVADO, AcaoReserva.CONFIRMADA);
+    }
+
+    /** Lacuna do QA: cancelar a viagem durante a expiração em lote não sobrescreve a reserva já expirada. */
+    @Test
+    void cancelamentoDaViagemDuranteExpiracaoNaoSobrescreve() throws Exception {
+        var vencida = reservaComPagamentoPendente(1, true).getReserva().getId();
+        var ativa = reservas.reservar(passageiroId, pedido(1)).getId();
+
+        comExpiracaoSegurando(() -> viagens.cancelar(viagemId, operadorId));
+
+        assertThat(reserva(vencida).getStatus()).isEqualTo(StatusReserva.EXPIRADA);
+        assertThat(reserva(ativa).getStatus()).isEqualTo(StatusReserva.CANCELADA);
+        assertThat(historicoRepository.findByReservaIdOrderByOrdemAsc(vencida)).extracting(h -> h.getAcao())
+                .doesNotContain(AcaoReserva.CANCELADA);
+    }
+
+    /** Lacuna do QA, ordem inversa: a expiração em lote pula a reserva travada pelo cancelamento (SKIP LOCKED). */
+    @Test
+    void expiracaoDuranteCancelamentoDaViagemPulaAReservaTravada() throws Exception {
+        var vencida = reservaComPagamentoPendente(1, true).getReserva().getId();
+        var expiradas = new java.util.concurrent.atomic.AtomicInteger(-1);
+        var travou = new CountDownLatch(1);
+        var liberar = new CountDownLatch(1);
+
+        var dono = CompletableFuture.runAsync(() -> transacao.executeWithoutResult(s -> {
+            viagens.cancelar(viagemId, operadorId);
+            travou.countDown();
+            aguardar(liberar);
+        }));
+        assertThat(travou.await(10, TimeUnit.SECONDS)).isTrue();
+        CompletableFuture.runAsync(() -> expiradas.set(reservas.expirarVencidas())).get(10, TimeUnit.SECONDS);
+        liberar.countDown();
+        dono.get(10, TimeUnit.SECONDS);
+
+        assertThat(expiradas.get()).isZero();
+        assertThat(reserva(vencida).getStatus()).isEqualTo(StatusReserva.CANCELADA);
+    }
+
+    /** QA N2: enquanto o provedor demora para criar a cobrança, a viagem não fica travada para outras reservas. */
+    @Test
+    void provedorLentoNaoSeguraAViagem() throws Exception {
+        var reserva = reservas.reservar(passageiroId, pedido(1));
+        var provedorChamado = new CountDownLatch(1);
+        var liberarProvedor = new CountDownLatch(1);
+        doAnswer(inv -> {
+            provedorChamado.countDown();
+            aguardar(liberarProvedor);
+            return inv.callRealMethod();
+        }).when(provedor).criarCobranca(anyString(), anyString(), any());
+
+        var pagamento = CompletableFuture.supplyAsync(() -> reservas.iniciarPagamento(reserva.getId(), passageiroId));
+        try {
+            assertThat(provedorChamado.await(10, TimeUnit.SECONDS)).isTrue();
+            // Com a trava segura durante a chamada, esta reserva ficaria esperando o provedor.
+            var outra = CompletableFuture.supplyAsync(() -> reservas.reservar(passageiroId, pedido(1)));
+            assertThat(outra.get(5, TimeUnit.SECONDS).getStatus()).isEqualTo(StatusReserva.AGUARDANDO_PAGAMENTO);
+        } finally {
+            liberarProvedor.countDown();
+        }
+
+        assertThat(pagamento.get(10, TimeUnit.SECONDS).getStatus()).isEqualTo(StatusPagamento.PENDENTE);
+    }
+
+    /** Duas chamadas de pagamento ao mesmo tempo: uma cobrança só, no provedor e no banco. */
+    @Test
+    void pagamentoIniciadoDuasVezesAoMesmoTempoGeraUmaCobranca() {
+        var reserva = reservas.reservar(passageiroId, pedido(1));
+        var largada = new CountDownLatch(1);
+
+        var cobrancas = List.of(1, 2).stream().map(i -> CompletableFuture.supplyAsync(() -> {
+            aguardar(largada);
+            return reservas.iniciarPagamento(reserva.getId(), passageiroId).getProvedorId();
+        })).toList();
+        largada.countDown();
+
+        assertThat(cobrancas.stream().map(CompletableFuture::join).distinct()).hasSize(1);
+        assertThat(pagamentoRepository.countByReservaId(reserva.getId())).isEqualTo(1);
     }
 
     @Test

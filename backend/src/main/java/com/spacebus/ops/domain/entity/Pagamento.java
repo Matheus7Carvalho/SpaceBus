@@ -10,7 +10,6 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -21,7 +20,6 @@ import java.math.BigDecimal;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 @Entity
 @Table(name = "PAGAMENTO")
 public class Pagamento extends BaseEntity {
@@ -47,4 +45,17 @@ public class Pagamento extends BaseEntity {
     /** Página do provedor onde o passageiro paga. */
     @Column(name = "URL_PAGAMENTO", nullable = false)
     private String urlPagamento;
+
+    /** Tentativas de reembolso que o provedor não concluiu; ao chegar no limite, o reembolso exige ação manual. */
+    @Column(name = "TENTATIVAS_REEMBOLSO", nullable = false)
+    private int tentativasReembolso;
+
+    public Pagamento(Reserva reserva, String provedorId, String metodo, BigDecimal valor, StatusPagamento status, String urlPagamento) {
+        this.reserva = reserva;
+        this.provedorId = provedorId;
+        this.metodo = metodo;
+        this.valor = valor;
+        this.status = status;
+        this.urlPagamento = urlPagamento;
+    }
 }

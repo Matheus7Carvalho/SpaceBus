@@ -58,6 +58,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/veiculo", "/api/veiculo/**").hasAnyRole(OPERACAO)
                         .requestMatchers("/api/rota", "/api/rota/**").hasAnyRole(OPERACAO)
                         .requestMatchers("/api/viagem", "/api/viagem/**").hasAnyRole(OPERACAO)
+                        .requestMatchers("/api/indicador", "/api/indicador/**").hasAnyRole(OPERACAO)
                         .requestMatchers("/api/usuario", "/api/usuario/**").hasAnyRole(OPERACAO)
                         .requestMatchers("/api/dev/**").hasRole("ADMINISTRADOR")
                         .requestMatchers("/api/**").authenticated()

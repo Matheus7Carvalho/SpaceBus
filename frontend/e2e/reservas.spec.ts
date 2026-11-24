@@ -1,6 +1,6 @@
 import { expect, request, test, type APIRequestContext, type Page } from '@playwright/test'
 import { contas, entrar, SENHA_DEMO } from './support/auth'
-import { SEED } from './support/cadastros'
+import { idDaVanE2E, SEED } from './support/cadastros'
 import { camposSemLimite } from './support/limites'
 
 /**
@@ -16,14 +16,14 @@ async function contextoOperador(page: Page) {
   return operador
 }
 
-/** Viagem publicada só deste teste, na rota da seed (4 pontos) e na van SBV2B34, preço R$ 15,00. */
+/** Viagem publicada só deste teste, na rota da seed (4 pontos) e na van de testes, preço R$ 15,00. */
 async function viagemPublicada(operador: APIRequestContext, capacidade: number) {
   const d = new Date()
   d.setDate(d.getDate() + 30 + Math.floor(Math.random() * 300))
   d.setHours(5 + Math.floor(Math.random() * 17), Math.floor(Math.random() * 60), 0, 0)
   const partida = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`
   const criada = await operador.post('/api/viagem', {
-    data: { rotaId: SEED.rotaCentroAeroporto, veiculoId: SEED.vanMaster, motoristaId: null, partida, preco: 15, capacidade },
+    data: { rotaId: SEED.rotaCentroAeroporto, veiculoId: await idDaVanE2E(operador), motoristaId: null, partida, preco: 15, capacidade },
   })
   expect(criada.ok()).toBe(true)
   const { id } = (await criada.json()) as { id: string }

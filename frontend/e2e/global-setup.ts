@@ -1,4 +1,6 @@
 import type { FullConfig } from '@playwright/test'
+import { contas, SENHA_DEMO } from './support/auth'
+import { VAN_E2E } from './support/cadastros'
 
 /**
  * Verificação de saúde antes da suíte E2E (ver docs/testes-instaveis.md, casos 3 e 4).
@@ -75,4 +77,19 @@ export default async function globalSetup(config: FullConfig) {
         'Suba o backend (docker compose --profile app up ou ./mvnw spring-boot:run) e rode de novo.',
     )
   }
+  await garantirVanE2E(base)
+}
+
+/** Cria a van dos testes (VAN_E2E) se ainda não existir; o teardown a apaga junto com as viagens dela. */
+async function garantirVanE2E(base: string) {
+  const login = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: contas.operador.email, senha: SENHA_DEMO }),
+  })
+  const cabecalhos = { Cookie: login.headers.getSetCookie().map((c) => c.split(';')[0]).join('; '), 'Content-Type': 'application/json' }
+  const lista = (await (await fetch(`${base}/api/veiculo?size=500`, { headers: cabecalhos })).json()) as { content: { placa: string }[] }
+  if (lista.content.some((v) => v.placa === VAN_E2E.placa)) return
+  const criada = await fetch(`${base}/api/veiculo`, { method: 'POST', headers: cabecalhos, body: JSON.stringify(VAN_E2E) })
+  if (!criada.ok) throw new Error(`Não foi possível criar a van de testes ${VAN_E2E.placa}: ${criada.status} ${await criada.text()}`)
 }

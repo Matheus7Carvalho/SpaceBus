@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { contas, entrar } from './support/auth'
-import { escolher, linhaCom, salvarCadastro, SEED } from './support/cadastros'
+import { escolher, idDaVanE2E, linhaCom, salvarCadastro, SEED } from './support/cadastros'
 
 const LISTA = '/operacao/viagens'
 
@@ -24,7 +24,7 @@ function partidaUnica() {
 /** Rascunho criado pela API, para o teste não depender de outro. */
 async function criarRascunho(page: Page) {
   const r = await page.request.post('/api/viagem', {
-    data: { rotaId: SEED.rotaCentroAeroporto, veiculoId: SEED.vanMaster, motoristaId: null, partida: `${partidaUnica()}:00`, preco: 15, capacidade: 12 },
+    data: { rotaId: SEED.rotaCentroAeroporto, veiculoId: await idDaVanE2E(page.request), motoristaId: null, partida: `${partidaUnica()}:00`, preco: 15, capacidade: 12 },
   })
   expect(r.ok()).toBe(true)
   return (await r.json()) as Viagem

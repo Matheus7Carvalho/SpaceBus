@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** Posição simulada para demonstração e testes. Só no perfil dev e só para Administrador (SecurityConfiguration). */
 @RestController
-@Profile("dev")
+@Profile({"dev", "e2e"})
 @RequestMapping(value = "/api/dev/localizacao", produces = "application/json")
 @Tag(name = "Desenvolvimento")
 public class LocalizacaoSimuladaController {

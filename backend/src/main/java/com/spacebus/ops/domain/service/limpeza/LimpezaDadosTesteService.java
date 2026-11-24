@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  * é apagado.
  */
 @Service
-@Profile("dev")
+@Profile({"dev", "e2e"})
 public class LimpezaDadosTesteService {
 
     /** Só marcas de teste: "E2E" ou "E2E-ABC123". Nunca um prefixo que pegue dados de demonstração. */

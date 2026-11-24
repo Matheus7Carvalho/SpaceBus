@@ -17,7 +17,7 @@ import java.util.UUID;
  * paralelo. O nome leva a marca, para a limpeza ({@link LimpezaDadosTesteService}) apagá-lo depois.
  */
 @Service
-@Profile("dev")
+@Profile({"dev", "e2e"})
 public class MotoristaTesteService {
 
     /** Mesma senha das contas de demonstração (seed de dev). */

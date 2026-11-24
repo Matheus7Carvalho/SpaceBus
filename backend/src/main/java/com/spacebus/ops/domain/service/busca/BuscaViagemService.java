@@ -20,6 +20,7 @@ import java.text.Normalizer;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.TreeSet;
@@ -51,10 +52,12 @@ public class BuscaViagemService implements IBuscaViagemService {
             throw new DomainException("Escolha hoje ou uma data futura.");
         }
         var inicio = busca.getData().atStartOfDay();
-        return viagemRepository.publicadasEntre(inicio, inicio.plusDays(1), agora, StatusViagem.PUBLICADA).stream()
-                .map(v -> trecho(v, busca.getOrigem(), busca.getDestino()).map(t -> encontrada(v, t)))
-                .flatMap(Optional::stream)
-                .toList();
+        var trechos = new LinkedHashMap<Viagem, Trecho>();
+        for (var v : viagemRepository.publicadasEntre(inicio, inicio.plusDays(1), agora, StatusViagem.PUBLICADA)) {
+            trecho(v, busca.getOrigem(), busca.getDestino()).ifPresent(t -> trechos.put(v, t));
+        }
+        var lugares = reservas.lugaresDisponiveis(trechos.keySet());
+        return trechos.entrySet().stream().map(e -> encontrada(e.getKey(), e.getValue(), lugares.get(e.getKey().getId()))).toList();
     }
 
     @Override
@@ -153,7 +156,7 @@ public class BuscaViagemService implements IBuscaViagemService {
                 .trim();
     }
 
-    private ViagemEncontradaResponse encontrada(Viagem viagem, Trecho trecho) {
+    private ViagemEncontradaResponse encontrada(Viagem viagem, Trecho trecho, int lugaresDisponiveis) {
         return ViagemEncontradaResponse.builder()
                 .id(viagem.getId())
                 .transportadora(transportadora)
@@ -163,7 +166,7 @@ public class BuscaViagemService implements IBuscaViagemService {
                 .tipoVeiculo(viagem.getVeiculo().getTipo())
                 .embarque(ponto(trecho.embarque()))
                 .desembarque(ponto(trecho.desembarque()))
-                .lugaresDisponiveis(lugaresDisponiveis(viagem))
+                .lugaresDisponiveis(lugaresDisponiveis)
                 .build();
     }
 

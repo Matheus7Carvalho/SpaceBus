@@ -47,22 +47,38 @@ public interface ViagemRepository extends BaseRepository<Viagem> {
               and (:id is null or v.id <> :id)""")
     boolean existeConflitoVeiculo(String veiculoId, LocalDateTime partida, String id, StatusViagem cancelada);
 
-    /** Viagens na situação informada com partida no intervalo [inicio, fim) e depois de agora, por horário. */
+    /**
+     * Viagens na situação informada com partida no intervalo [inicio, fim) e depois de agora, por horário.
+     * Rota, pontos, rotina e veículo vêm na mesma consulta (a busca lê todos). Sem o fetch da rotina, a rota sem
+     * rotina (OneToOne inverso, EAGER) gera uma consulta por viagem: o Hibernate não guarda o "nulo".
+     */
     @Query("""
             select v from Viagem v
+              join fetch v.rota r join fetch r.pontos left join fetch r.rotina join fetch v.veiculo left join fetch v.motorista
             where v.status = :status and v.partida >= :inicio and v.partida < :fim and v.partida > :agora
             order by v.partida""")
     List<Viagem> publicadasEntre(LocalDateTime inicio, LocalDateTime fim, LocalDateTime agora, StatusViagem status);
 
-    @Query("select v from Viagem v where v.status = :status and v.partida > :agora")
+    /** Com rota e pontos na mesma consulta (a lista de locais lê todos). */
+    @Query("""
+            select v from Viagem v
+              join fetch v.rota r join fetch r.pontos left join fetch r.rotina join fetch v.veiculo left join fetch v.motorista
+            where v.status = :status and v.partida > :agora""")
     List<Viagem> publicadasFuturas(LocalDateTime agora, StatusViagem status);
 
     /**
      * Agenda do operador: partida a partir de {@code inicio} e, se informado, antes de {@code fim};
      * rota e situação opcionais. Os opcionais vêm como texto para o PostgreSQL saber o tipo do parâmetro nulo.
+     * Rota, rotina e veículo vêm junto (só associações simples: a paginação continua no banco).
      */
-    @Query("""
+    @Query(value = """
             select v from Viagem v
+              join fetch v.rota r left join fetch r.rotina join fetch v.veiculo left join fetch v.motorista
+            where v.partida >= :inicio and v.partida < :fim
+              and (:rotaId is null or v.rota.id = :rotaId)
+              and (:status is null or cast(v.status as string) = :status)""",
+            countQuery = """
+            select count(v) from Viagem v
             where v.partida >= :inicio and v.partida < :fim
               and (:rotaId is null or v.rota.id = :rotaId)
               and (:status is null or cast(v.status as string) = :status)""")

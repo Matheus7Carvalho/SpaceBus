@@ -34,6 +34,15 @@ public interface ReservaRepository extends BaseRepository<Reserva> {
               and r.id <> :exceto""")
     int lugaresOcupados(String viagemId, LocalDateTime agora, String exceto);
 
+    /** A mesma conta de {@link #lugaresOcupados} para várias viagens numa consulta: pares [viagemId, lugares]. */
+    @Query("""
+            select r.viagem.id, sum(r.quantidade) from Reserva r
+            where r.viagem.id in :viagemIds
+              and (r.status = com.spacebus.ops.domain.entity.enums.StatusReserva.CONFIRMADA
+                   or (r.status = com.spacebus.ops.domain.entity.enums.StatusReserva.AGUARDANDO_PAGAMENTO and r.expiraEm > :agora))
+            group by r.viagem.id""")
+    List<Object[]> lugaresOcupadosPorViagem(Collection<String> viagemIds, LocalDateTime agora);
+
     boolean existsByCodigo(String codigo);
 
     List<Reserva> findByPassageiroIdOrderByDataCriacaoDesc(String passageiroId);

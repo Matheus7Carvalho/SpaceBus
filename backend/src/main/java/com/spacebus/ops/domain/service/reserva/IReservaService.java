@@ -7,7 +7,9 @@ import com.spacebus.ops.domain.entity.Viagem;
 import com.spacebus.ops.domain.model.reserva.ReservaRequest;
 import com.spacebus.ops.domain.model.reserva.RetornoPagamentoRequest;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -42,6 +44,9 @@ public interface IReservaService {
 
     /** Capacidade − (confirmadas + aguardando dentro do prazo). */
     int lugaresDisponiveis(Viagem viagem);
+
+    /** Lugares disponíveis de cada viagem (id → lugares), com uma consulta só. */
+    Map<String, Integer> lugaresDisponiveis(Collection<Viagem> viagens);
 
     int lugaresOcupados(String viagemId);
 

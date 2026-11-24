@@ -37,7 +37,10 @@ import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -280,6 +283,19 @@ public class ReservaService implements IReservaService {
     @Override
     public int lugaresDisponiveis(Viagem viagem) {
         return Math.max(0, viagem.getCapacidade() - lugaresOcupados(viagem.getId()));
+    }
+
+    @Override
+    public Map<String, Integer> lugaresDisponiveis(Collection<Viagem> viagens) {
+        if (viagens.isEmpty()) return Map.of();
+        var ocupados = new HashMap<String, Integer>();
+        var ids = viagens.stream().map(Viagem::getId).toList();
+        for (var linha : reservaRepository.lugaresOcupadosPorViagem(ids, agora())) {
+            ocupados.put((String) linha[0], ((Number) linha[1]).intValue());
+        }
+        var disponiveis = new HashMap<String, Integer>();
+        viagens.forEach(v -> disponiveis.put(v.getId(), Math.max(0, v.getCapacidade() - ocupados.getOrDefault(v.getId(), 0))));
+        return disponiveis;
     }
 
     @Override

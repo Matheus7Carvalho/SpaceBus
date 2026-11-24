@@ -56,7 +56,11 @@ class BuscaViagemServiceTest {
     @BeforeEach
     void setUp() {
         service = new BuscaViagemService(repository, reservas, CLOCK, "Transportadora piloto");
-        lenient().when(reservas.lugaresDisponiveis(any())).thenAnswer(inv -> ((Viagem) inv.getArgument(0)).getCapacidade());
+        lenient().when(reservas.lugaresDisponiveis(any(Viagem.class))).thenAnswer(inv -> ((Viagem) inv.getArgument(0)).getCapacidade());
+        lenient().when(reservas.lugaresDisponiveis(org.mockito.ArgumentMatchers.<java.util.Collection<Viagem>>any())).thenAnswer(inv -> {
+            java.util.Collection<Viagem> viagens = inv.getArgument(0);
+            return viagens.stream().collect(java.util.stream.Collectors.toMap(Viagem::getId, Viagem::getCapacidade));
+        });
         var pontos = new ArrayList<PontoParada>();
         String[][] dados = {{"Terminal Central", "Plataforma 3"}, {"Praça Principal", null}, {"Shopping", "Portão B"}, {"Aeroporto", "Desembarque"}};
         for (int i = 0; i < dados.length; i++) {
